@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "970715534755",
+    "project_id": "rockifyorigins",
+    "storage_bucket": "rockifyorigins.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:970715534755:android:f4f260d0680cba1c017616",
+        "android_client_info": {
+          "package_name": "com.example.proyecto_rockify"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfdYl-O07xm_MnOfIHoUaSWvGBXwFXi4E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
