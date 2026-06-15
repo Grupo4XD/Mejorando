@@ -7,19 +7,19 @@ import 'package:proyecto_rockify/widgets/variables.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class PantallaOauth extends StatefulWidget {
   final String nombreUsuario; // <-- Agregamos esta línea
-  const PantallaOauth({super.key,required this.nombreUsuario});
+  const PantallaOauth({super.key, required this.nombreUsuario});
 
   @override
   State<PantallaOauth> createState() => _PantallaOauthState();
 }
 
 class _PantallaOauthState extends State<PantallaOauth> {
-  
   late WebViewController _controller;
-  
+
   bool cargando = false;
   String? error_autenticacion;
 
@@ -35,8 +35,12 @@ class _PantallaOauthState extends State<PantallaOauth> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              PantallaSala(token: tokencito, codigoSala: codigoDeLaSala),
+          builder: (context) => PantallaSala(
+            token: tokencito,
+            codigoSala: codigoDeLaSala,
+            //Pasamos el nombre a la pantalla del usuario
+            nombreUsuarioActual: widget.nombreUsuario,
+          ),
         ),
       );
     } else {
@@ -84,17 +88,14 @@ class _PantallaOauthState extends State<PantallaOauth> {
         print("🏠 Creando sala con código: $codigoSala");
 
         // Cambiamos la estructura para usar un Array de Firestore
-        await FirebaseFirestore.instance
-            .collection('salas')
-            .doc(codigoSala)
-            .set({
-              'codigo_sala': codigoSala,
-              'spotify_access_token': token,
-              'spotify_refresh_token': refreshToken,
-              // Guardamos al creador como el primer integrante de la lista de usuarios conectados
-              'usuarios': [widget.nombreUsuario], 
-              'creado_en': FieldValue.serverTimestamp(),
-            });
+        await FirebaseFirestore.instance.collection('salas').doc(codigoSala).set({
+          'codigo_sala': codigoSala,
+          'spotify_access_token': token,
+          'spotify_refresh_token': refreshToken,
+          // Guardamos al creador como el primer integrante de la lista de usuarios conectados
+          'usuarios': [widget.nombreUsuario],
+          'creado_en': FieldValue.serverTimestamp(),
+        });
 
         print("✅ Sala creada en Firestore");
         return {"token": token, "codigoSala": codigoSala};
@@ -150,7 +151,7 @@ class _PantallaOauthState extends State<PantallaOauth> {
     return Scaffold(
       backgroundColor: const Color(0xFF001A1A), // Tu fondo oscuro de Rockola
       body: cargando
-          ? const Center(
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -160,7 +161,9 @@ class _PantallaOauthState extends State<PantallaOauth> {
                   SizedBox(height: 20),
                   Text(
                     "Cargando sala",
-                    style: TextStyle(color: Variables.textos_primarios),
+                    style: GoogleFonts.comfortaa(
+                      color: Variables.textos_primarios,
+                    ),
                   ),
                 ],
               ),

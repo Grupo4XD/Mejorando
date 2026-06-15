@@ -65,6 +65,7 @@ class _PantallaInvitadoState extends State<PantallaInvitado> {
               codigoSala: codigo,
               token:
                   '', // Le pasamos un texto vacío; la pantalla se encargará de buscar el real
+                  nombreUsuarioActual: nombre,
             ),
           ),
         );

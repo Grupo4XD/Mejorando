@@ -9,10 +9,12 @@ import 'package:proyecto_rockify/pantallas/peticionesApi.dart';
 class PantallaSala extends StatefulWidget {
   final String codigoSala;
   final String token;
+  final String nombreUsuarioActual;
   const PantallaSala({
     super.key,
     required this.token,
     required this.codigoSala,
+    required this.nombreUsuarioActual,
   });
 
   @override
@@ -21,13 +23,16 @@ class PantallaSala extends StatefulWidget {
 
 class _PantallaSalaState extends State<PantallaSala> {
   String _tokenActual = ''; // <-- Almacenará el token de forma interna
+  List<String> _usuariosDislike =
+      []; // <-- Guardará los nombres de quienes dieron dislike
+
   // ── VARIABLES DEL BUSCADOR ──────────────────────────────────────────
   final TextEditingController _buscadorController = TextEditingController();
   Timer? _debounceBusqueda;
   bool _buscandoApi = false;
   List<Map<String, dynamic>> _resultadosBusqueda = [];
   bool _mostrarAlertaExito = false;
-  //########### VARIABLES DE LA COLA DE REPRODUCCION
+  //########### VARIABLES DE LA COLA DE REPRODUCCION ###############
   bool dislikePresionado = false;
   int dislikesCancionActual = 0;
   double progresoCancion = 0.0;
@@ -41,6 +46,11 @@ class _PantallaSalaState extends State<PantallaSala> {
   int usuariosEnLinea = 1;
   StreamSubscription<DocumentSnapshot>? _streamUsuarios;
 
+  //############## Mostrar usaurios y dislikes
+  List<String> _nombresUsuarios =
+      []; // <-- Guardará todos los nombres de la sala
+  int _dislikesRequeridos =
+      1; // <-- Configuración por defecto para saltar canción
   // ── LISTA DE COLA ───────────────────────────────────────────────────
   // Cada elemento tiene: { 'titulo': ..., 'artista': ..., 'imagen': ... }
   List<Map<String, dynamic>> listaColaEspera = [];
@@ -222,8 +232,17 @@ class _PantallaSalaState extends State<PantallaSala> {
               final List<dynamic> listaUsuarios = datos['usuarios'] ?? [];
 
               setState(() {
+                //Para traer los nombres de los usauriso
+                _nombresUsuarios = List<String>.from(listaUsuarios);
                 // El número de usuarios en línea ahora es el tamaño de la lista
                 usuariosEnLinea = listaUsuarios.length;
+
+                // Si el creador ya configuró los dislikes en la base de datos, los leemos aquí
+                _dislikesRequeridos = datos['dislikes_requeridos'] ?? 1;
+
+                // Leemos la lista de dislikes. Si no existe, usamos una lista vacía.
+                final List<dynamic> dislikes = datos['usuarios_dislike'] ?? [];
+                _usuariosDislike = List<String>.from(dislikes);
 
                 // Actualizamos el token dinámicamente (vital para los invitados)
                 _tokenActual = datos['spotify_access_token'] ?? '';
@@ -263,6 +282,207 @@ class _PantallaSalaState extends State<PantallaSala> {
     super.dispose();
   }
 
+  //################# FUNCION VENTANA EMERGENTE ##################
+  void _mostrarUsuariosEnLinea() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        // 1. ENVOLVEMOS TODO EN UN StatefulBuilder
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            // <-- setStateDialog es nuestro nuevo actualizador local
+
+            bool esCreador =
+                _nombresUsuarios.isNotEmpty &&
+                widget.nombreUsuarioActual == _nombresUsuarios[0];
+
+            return AlertDialog(
+              backgroundColor: Variables.fondoBotones,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Text(
+                "Usuarios en la Sala",
+                style: GoogleFonts.comfortaa(
+                  color: Variables.textos_primarios,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // --- LISTA DE USUARIOS ---
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _nombresUsuarios.length,
+                        itemBuilder: (context, index) {
+                          bool esElCreador = index == 0;
+                          return ListTile(
+                            leading: Icon(
+                              esElCreador ? Icons.star : Icons.person,
+                              color: esElCreador
+                                  ? Colors.amber
+                                  : Colors.white70,
+                            ),
+                            title: Text(
+                              _nombresUsuarios[index],
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                            ),
+                            trailing:
+                                _nombresUsuarios[index] ==
+                                    widget.nombreUsuarioActual
+                                ? const Text(
+                                    "(Tú)",
+                                    style: TextStyle(
+                                      color: Variables.textos_primarios,
+                                    ),
+                                  )
+                                : null,
+                          );
+                        },
+                      ),
+                    ),
+
+                    // --- CONFIGURACIÓN DE DISLIKES ---
+                    if (esCreador) ...[
+                      const Divider(
+                        color: Colors.white24,
+                        height: 30,
+                        thickness: 1,
+                      ),
+                      Text(
+                        "Configuración del Creador",
+                        style: GoogleFonts.comfortaa(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "Dislikes para pasar:",
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.remove_circle_outline,
+                                  color: Variables.textos_primarios,
+                                ),
+                                onPressed: () {
+                                  if (_dislikesRequeridos > 1) {
+                                    // 2. ACTUALIZAMOS LA VENTANA AL INSTANTE
+                                    setStateDialog(() {
+                                      _dislikesRequeridos--;
+                                    });
+                                    // 3. MANDAMOS EL DATO A FIREBASE EN SEGUNDO PLANO
+                                    FirebaseFirestore.instance
+                                        .collection('salas')
+                                        .doc(widget.codigoSala)
+                                        .update({
+                                          'dislikes_requeridos':
+                                              _dislikesRequeridos,
+                                        });
+                                  }
+                                },
+                              ),
+                              Text(
+                                "$_dislikesRequeridos",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.add_circle_outline,
+                                  color: Variables.textos_primarios,
+                                ),
+                                onPressed: () {
+                                  // 2. ACTUALIZAMOS LA VENTANA AL INSTANTE
+                                  setStateDialog(() {
+                                    _dislikesRequeridos++;
+                                  });
+                                  // 3. MANDAMOS EL DATO A FIREBASE EN SEGUNDO PLANO
+                                  FirebaseFirestore.instance
+                                      .collection('salas')
+                                      .doc(widget.codigoSala)
+                                      .update({
+                                        'dislikes_requeridos':
+                                            _dislikesRequeridos,
+                                      });
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  //############## BOTON PARA DAR DISLIKES #########################
+  Future<void> _darDislike() async {
+    // 1. Verificamos si el usuario ya votó
+    if (_usuariosDislike.contains(widget.nombreUsuarioActual)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ya diste dislike a esta canción')),
+      );
+      return;
+    }
+
+    // Referencia a nuestra sala en Firestore
+    DocumentReference salaRef = FirebaseFirestore.instance
+        .collection('salas')
+        .doc(widget.codigoSala);
+
+    // 2. Agregamos el nombre del usuario a la lista de dislikes
+    await salaRef.update({
+      'usuarios_dislike': FieldValue.arrayUnion([widget.nombreUsuarioActual]),
+    });
+
+    // 3. Verificamos si con este nuevo voto alcanzamos la meta
+    // (Sumamos 1 porque la lista local tardará unos milisegundos en actualizarse desde Firebase)
+    if (_usuariosDislike.length + 1 >= _dislikesRequeridos) {
+      print("⏭️ ¡Límite de dislikes alcanzado! Saltando canción...");
+
+      // Llamamos a tu API para saltar la canción (cualquiera puede hacerlo porque todos comparten _tokenActual)
+      bool exito = await Peticionesapi.saltarSiguienteCancion(_tokenActual);
+
+      if (exito) {
+        // Vaciamos la lista de dislikes en Firebase para la nueva canción
+        await salaRef.update({
+          'usuarios_dislike': [], // Lo sobreescribimos con un arreglo vacío
+        });
+
+        // Refrescamos el reproductor de inmediato
+        _actualizarReproductor();
+      } else {
+        print("❌ Error al intentar saltar la canción en Spotify");
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -274,7 +494,7 @@ class _PantallaSalaState extends State<PantallaSala> {
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 16.0,
-              vertical: 5.0,
+              vertical: 35.0,
             ),
             child: Column(
               children: [
@@ -342,10 +562,12 @@ class _PantallaSalaState extends State<PantallaSala> {
                           ),
                         ),
                       ),
+
                       SizedBox(
                         height: 40,
                         child: ElevatedButton.icon(
-                          onPressed: () {},
+                          onPressed: _mostrarUsuariosEnLinea,
+
                           style: Variables.estiloBotones,
                           icon: const Icon(Icons.person),
                           label: Text(
@@ -415,7 +637,16 @@ class _PantallaSalaState extends State<PantallaSala> {
                         textAlign: TextAlign.center,
                       ),
 
-                      const SizedBox(height: 10),
+                      SizedBox(height: 4),
+
+                      Text(
+                        "Dislikes requeridos para saltar: ${_dislikesRequeridos.toString()}",
+                        style: GoogleFonts.comfortaa(
+                          color: Variables.textos_primarios,
+                        ),
+                      ),
+
+                      const SizedBox(height: 3),
 
                       // Barra de progreso
                       Slider(
@@ -529,25 +760,29 @@ class _PantallaSalaState extends State<PantallaSala> {
                                       ? Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
+                                            // Mostramos visualmente el progreso, ej: "1/3"
                                             Text(
-                                              "$dislikesCancionActual",
+                                              "${_usuariosDislike.length}/$_dislikesRequeridos",
                                               style: const TextStyle(
                                                 color: Colors.redAccent,
                                                 fontWeight: FontWeight.bold,
+                                                fontSize: 16,
                                               ),
                                             ),
                                             IconButton(
-                                              icon: const Icon(
-                                                Icons.thumb_down,
+                                              // Si el usuario ya está en la lista, mostramos el ícono relleno, sino el delineado
+                                              icon: Icon(
+                                                _usuariosDislike.contains(
+                                                      widget
+                                                          .nombreUsuarioActual,
+                                                    )
+                                                    ? Icons.thumb_down
+                                                    : Icons.thumb_down_off_alt,
                                                 color: Colors.red,
-                                                size: 22,
+                                                size: 26,
                                               ),
-                                              onPressed: () {
-                                                setState(() {
-                                                  dislikesCancionActual++;
-                                                  dislikePresionado = true;
-                                                });
-                                              },
+                                              onPressed:
+                                                  _darDislike, // Conectamos la nueva función
                                             ),
                                           ],
                                         )
