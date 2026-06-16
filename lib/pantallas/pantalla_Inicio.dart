@@ -13,48 +13,60 @@ class PantallaInicio extends StatefulWidget {
 class _PantallaInicioState extends State<PantallaInicio> {
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 60),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 45,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PantallaName(),
-                  ), // <-- Cambiado aquí
-                );
-              },
-              style: Variables.estiloBotones,
-              child: Text('Crear Sala'),
-            ),
-          ),
+    // 1. Agregamos el Scaffold aquí para que la pantalla sea independiente
+    return Scaffold(
+      //Para que el body se extienda hasta arriba y haga que se vea como transparente
+      extendBodyBehindAppBar: true,
+      appBar: Variables.MiAppbar, // Traemos tu AppBar personalizado
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          color: Variables.fondoInferior,
+        ), // Traemos el fondo
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 60),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: 45,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PantallaName(),
+                      ),
+                    );
+                  },
+                  style: Variables.estiloBotones,
+                  child: const Text('Crear Sala'),
+                ),
+              ),
 
-          const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-          SizedBox(
-            width: double.infinity,
-            height: 45,
-            child: ElevatedButton(
-              onPressed: () {
-                // Navegamos a la pantalla de invitados que acabamos de crear
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PantallaInvitado(),
-                  ),
-                );
-              },
-              style: Variables.estiloBotones,
-              child: Text('Unirse a Sala'),
-            ),
+              SizedBox(
+                width: double.infinity,
+                height: 45,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PantallaInvitado(),
+                      ),
+                    );
+                  },
+                  style: Variables.estiloBotones,
+                  child: const Text('Unirse a Sala'),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

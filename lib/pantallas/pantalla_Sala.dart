@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:proyecto_rockify/main.dart';
 import 'package:proyecto_rockify/pantallas/pantalla_Inicio.dart';
 import 'package:proyecto_rockify/widgets/variables.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -22,10 +23,14 @@ class PantallaSala extends StatefulWidget {
 }
 
 class _PantallaSalaState extends State<PantallaSala> {
+  //Para mostrar la quis en el buscador
+  bool mostrarequis = false;
+
   String _tokenActual = ''; // <-- Almacenará el token de forma interna
 
-  List<String> _usuariosDislike =
-      []; // <-- Guardará los nombres de quienes dieron dislike
+  //############## VARIABLE PARA VER EL BUSCADOR
+
+  List<String> _usuariosDislike = []; // <-- Nombres de quienes dieron dislike
   //###### PARA RASTREAR LA CANCION QUE ESTA SONANDO #######
   String _idCancionActual = ''; // <-- Rastreará qué canción está sonando
 
@@ -34,7 +39,6 @@ class _PantallaSalaState extends State<PantallaSala> {
   Timer? _debounceBusqueda;
   bool _buscandoApi = false;
   List<Map<String, dynamic>> _resultadosBusqueda = [];
-  bool _mostrarAlertaExito = false;
   //########### VARIABLES DE LA COLA DE REPRODUCCION ###############
   bool dislikePresionado = false;
   int dislikesCancionActual = 0;
@@ -64,10 +68,15 @@ class _PantallaSalaState extends State<PantallaSala> {
   void _alEscribirTexto(String texto) {
     if (_debounceBusqueda?.isActive ?? false) _debounceBusqueda!.cancel();
 
+    setState(() {
+      mostrarequis = true;
+    });
+
     if (texto.isEmpty) {
       setState(() {
         _resultadosBusqueda = [];
         _buscandoApi = false;
+        mostrarequis = false;
       });
       return;
     }
@@ -90,23 +99,25 @@ class _PantallaSalaState extends State<PantallaSala> {
   }
 
   void _agregarCancion(String idCancion) async {
-    FocusScope.of(context).unfocus(); // Oculta el teclado
-
-    print("🔄 Intentando agregar la canción a Spotify...");
-
     // Llamada a tu API
+
     bool exito = await Peticionesapi.anadirACola(idCancion, _tokenActual);
 
     if (exito && mounted) {
       print("✅ ¡La API aceptó la canción! Mostrando alerta...");
-      setState(() => _mostrarAlertaExito = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green,
+          content: Text("¡'$titulo' guardada en la lista de la sala!"),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      setState(() {
+        _buscadorController.clear();
+      });
 
       // Actualizamos la cola para que aparezca en pantalla de inmediato
       _actualizarReproductor();
-
-      Timer(const Duration(seconds: 2), () {
-        if (mounted) setState(() => _mostrarAlertaExito = false);
-      });
     } else {
       // Si entra aquí, Spotify dijo que NO. Revisa tu consola de depuración.
       print("⚠️ Falló la inserción. La alerta flotante no se mostrará.");
@@ -343,81 +354,117 @@ class _PantallaSalaState extends State<PantallaSala> {
               ),
               content: SizedBox(
                 width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // --- LISTA DE USUARIOS ---
-                    Container(
-                      constraints: const BoxConstraints(maxHeight: 200),
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _nombresUsuarios.length,
-                        itemBuilder: (context, index) {
-                          bool esElCreador = index == 0;
-                          return ListTile(
-                            leading: Icon(
-                              esElCreador ? Icons.star : Icons.person,
-                              color: esElCreador
-                                  ? Colors.amber
-                                  : Colors.white70,
-                            ),
-                            title: Text(
-                              _nombresUsuarios[index],
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // --- LISTA DE USUARIOS ---
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _nombresUsuarios.length,
+                          itemBuilder: (context, index) {
+                            bool esElCreador = index == 0;
+                            return ListTile(
+                              leading: Icon(
+                                esElCreador ? Icons.star : Icons.person,
+                                color: esElCreador
+                                    ? Colors.amber
+                                    : Colors.white70,
                               ),
-                            ),
-                            trailing:
-                                _nombresUsuarios[index] ==
-                                    widget.nombreUsuarioActual
-                                ? const Text(
-                                    "(Tú)",
-                                    style: TextStyle(
-                                      color: Variables.textos_primarios,
-                                    ),
-                                  )
-                                : null,
-                          );
-                        },
-                      ),
-                    ),
-
-                    // --- CONFIGURACIÓN DE DISLIKES ---
-                    if (esCreador) ...[
-                      const Divider(
-                        color: Colors.white24,
-                        height: 30,
-                        thickness: 1,
-                      ),
-                      Text(
-                        "Configuración del Creador",
-                        style: GoogleFonts.comfortaa(
-                          color: Colors.white70,
-                          fontSize: 12,
+                              title: Text(
+                                _nombresUsuarios[index],
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              trailing:
+                                  _nombresUsuarios[index] ==
+                                      widget.nombreUsuarioActual
+                                  ? const Text(
+                                      "(Tú)",
+                                      style: TextStyle(
+                                        color: Variables.textos_primarios,
+                                      ),
+                                    )
+                                  : null,
+                            );
+                          },
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "Dislikes para pasar:",
-                            style: TextStyle(color: Colors.white),
+                  
+                      // --- CONFIGURACIÓN  DE DISLIKES ---
+                      if (esCreador) ...[
+                        const Divider(
+                          color: Colors.white24,
+                          height: 30,
+                          thickness: 1,
+                        ),
+                        Text(
+                          "Configuración del Creador",
+                          style: GoogleFonts.comfortaa(
+                            color: Colors.white70,
+                            fontSize: 12,
                           ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.remove_circle_outline,
-                                  color: Variables.textos_primarios,
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            //Expanded le dara todo el espacio nesesario a lo widgets para que se acomoden
+                            Expanded(
+
+                              child: const Text(
+                                "Dislikes para pasar:",
+                                style: TextStyle(color: Colors.white),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.remove_circle_outline,
+                                    color: Variables.textos_primarios,
+                                  ),
+                                  onPressed: () {
+                                    if (_dislikesRequeridos > 1) {
+                                      // 2. ACTUALIZAMOS LA VENTANA AL INSTANTE
+                                      setStateDialog(() {
+                                        _dislikesRequeridos--;
+                                      });
+                                      // 3. MANDAMOS EL DATO A FIREBASE EN SEGUNDO PLANO
+                                      FirebaseFirestore.instance
+                                          .collection('salas')
+                                          .doc(widget.codigoSala)
+                                          .update({
+                                            'dislikes_requeridos':
+                                                _dislikesRequeridos,
+                                          });
+                                    }
+                                  },
                                 ),
-                                onPressed: () {
-                                  if (_dislikesRequeridos > 1) {
+                                Text(
+                                  "$_dislikesRequeridos",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.add_circle_outline,
+                                    color: Variables.textos_primarios,
+                                  ),
+                                  onPressed: () {
                                     // 2. ACTUALIZAMOS LA VENTANA AL INSTANTE
                                     setStateDialog(() {
-                                      _dislikesRequeridos--;
+                                      _dislikesRequeridos++;
                                     });
                                     // 3. MANDAMOS EL DATO A FIREBASE EN SEGUNDO PLANO
                                     FirebaseFirestore.instance
@@ -427,43 +474,15 @@ class _PantallaSalaState extends State<PantallaSala> {
                                           'dislikes_requeridos':
                                               _dislikesRequeridos,
                                         });
-                                  }
-                                },
-                              ),
-                              Text(
-                                "$_dislikesRequeridos",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                  },
                                 ),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.add_circle_outline,
-                                  color: Variables.textos_primarios,
-                                ),
-                                onPressed: () {
-                                  // 2. ACTUALIZAMOS LA VENTANA AL INSTANTE
-                                  setStateDialog(() {
-                                    _dislikesRequeridos++;
-                                  });
-                                  // 3. MANDAMOS EL DATO A FIREBASE EN SEGUNDO PLANO
-                                  FirebaseFirestore.instance
-                                      .collection('salas')
-                                      .doc(widget.codigoSala)
-                                      .update({
-                                        'dislikes_requeridos':
-                                            _dislikesRequeridos,
-                                      });
-                                },
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             );
@@ -522,476 +541,447 @@ class _PantallaSalaState extends State<PantallaSala> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Variables.fondoInferior,
 
       //###################### BUSCADOR ##################
-      body: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 15.0,
-            ),
-            child: Column(
-              children: [
-                SizedBox(
-                  height: 45,
-                  child: TextField(
-                    controller:
-                        _buscadorController, //  Se conecta al controlador
-                    onChanged: _alEscribirTexto, //  Dispara el Timer
-                    style: GoogleFonts.comfortaa(
-                      color: Variables.textos_primarios,
-                      fontSize: 15,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: "Ingresa una canción",
-                      hintStyle: TextStyle(
-                        color: Variables.textos_primarios.withOpacity(0.5),
-                      ),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: Variables.textos_primarios,
-                      ),
-                      filled: true,
-                      fillColor: Colors.black.withOpacity(0.2),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide(
-                          color: Variables.textos_primarios.withOpacity(0.4),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide(
+      //Safe area detecta la muesca de camara del telefono o su barra de notificaciones y le da un area segura para delimitar el espacio
+      body: SafeArea(
+        child: Stack(
+          children: [
+            //Identifica si todo el contenido cabe en la pantalla sino activa un scrolling
+           
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 30.0,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 45,
+                      child: TextField(
+                        controller:
+                            _buscadorController, //  Se conecta al controlador
+                        onChanged: _alEscribirTexto, //  Dispara el Timer
+                        style: GoogleFonts.comfortaa(
                           color: Variables.textos_primarios,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // ── RESULTADOS DE BÚSQUEDA (Condicional) ────────────────────────
-
-                // ── SI NO HAY TEXTO, MUESTRA TU UI NORMAL ─────────────────────
-                Padding(
-                  padding: const EdgeInsets.only(top: 15, bottom: 15),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      SizedBox(
-                        height: 40,
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: Variables.estiloBotones,
-                          child: Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: Text(
-                              "ID: ${widget.codigoSala}",
-                              style: const TextStyle(fontSize: 18),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(
-                        height: 40,
-                        child: ElevatedButton.icon(
-                          onPressed: _mostrarUsuariosEnLinea,
-
-                          style: Variables.estiloBotones,
-                          icon: const Icon(Icons.person),
-                          label: Text(
-                            "$usuariosEnLinea",
-                            style: TextStyle(fontSize: 18),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ============================================================
-                // BLOQUE 1: REPRODUCTOR ACTUAL
-                // ============================================================
-                Container(
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.4),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Column(
-                    children: [
-                      // Portada de la canción
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          width: 180,
-                          height: 180,
-                          color: Colors.grey[900],
-                          child: Image.network(
-                            imagen,
-                            fit: BoxFit.cover,
-                            // Si la imagen falla, muestra un icono
-                            errorBuilder: (_, _, _) => const Icon(
-                              Icons.album,
-                              color: Colors.white54,
-                              size: 80,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Título
-                      Text(
-                        titulo,
-                        style: GoogleFonts.comfortaa(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      // Artista
-                      Text(
-                        artista,
-                        style: GoogleFonts.comfortaa(
-                          color: Colors.grey,
                           fontSize: 15,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-
-                      SizedBox(height: 4),
-
-                      Text(
-                        "Dislikes requeridos para saltar: ${_dislikesRequeridos.toString()}",
-                        style: GoogleFonts.comfortaa(
-                          color: Variables.textos_primarios,
-                        ),
-                      ),
-
-                      const SizedBox(height: 3),
-
-                      // Barra de progreso
-                      Slider(
-                        value: progresoCancion,
-                        onChanged: (value) {},
-                        activeColor: Variables.textos_primarios,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Separador visual
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
-                    child: Text(
-                      "Lista de reproducción",
-                      style: GoogleFonts.comfortaa(
-                        color: Variables.textos_primarios,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // ============================================================
-                // BLOQUE 2: COLA DE CANCIONES
-                // ============================================================
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: listaColaEspera.isEmpty
-                        ? Center(
-                            child: Text(
-                              "La cola está vacía, ¡añade canciones!",
-                              style: GoogleFonts.comfortaa(
-                                color: Variables.textos_primarios.withOpacity(
-                                  0.4,
-                                ),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: listaColaEspera.length,
-                            itemBuilder: (context, index) {
-                              final cancionCola = listaColaEspera[index];
-                              final bool esLaQueEstaSonando = (index == 0);
-                              //print("La lista de canciones son: $cancionCola");
-
-                              return Container(
-                                margin: const EdgeInsets.symmetric(
-                                  vertical: 4,
-                                  horizontal: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: esLaQueEstaSonando
-                                      ? const Color(0xFF0D2A2A)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: esLaQueEstaSonando
-                                      ? Border.all(
-                                          color: const Color(
-                                            0xFF00FFCC,
-                                          ).withOpacity(0.5),
-                                          width: 1,
-                                        )
-                                      : null,
-                                ),
-                                child: ListTile(
-                                  leading: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: cancionCola['imagen'] != ''
-                                        ? Image.network(
-                                            cancionCola['imagen'],
-                                            width: 45,
-                                            height: 45,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, _, _) =>
-                                                _iconoMusica(
-                                                  esLaQueEstaSonando,
-                                                ),
-                                          )
-                                        : _iconoMusica(esLaQueEstaSonando),
-                                  ),
-                                  title: Text(
-                                    cancionCola['titulo'],
-                                    style: GoogleFonts.comfortaa(
-                                      color: esLaQueEstaSonando
-                                          ? Colors.white
-                                          : Colors.white70,
-                                      fontWeight: esLaQueEstaSonando
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    cancionCola['artista'],
-                                    style: GoogleFonts.comfortaa(
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  trailing: esLaQueEstaSonando
-                                      ? Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            // Mostramos visualmente el progreso, ej: "1/3"
-                                            Text(
-                                              "${_usuariosDislike.length}/$_dislikesRequeridos",
-                                              style: const TextStyle(
-                                                color: Colors.redAccent,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                            IconButton(
-                                              // Si el usuario ya está en la lista, mostramos el ícono relleno, sino el delineado
-                                              icon: Icon(
-                                                _usuariosDislike.contains(
-                                                      widget
-                                                          .nombreUsuarioActual,
-                                                    )
-                                                    ? Icons.thumb_down
-                                                    : Icons.thumb_down_off_alt,
-                                                color: Colors.red,
-                                                size: 26,
-                                              ),
-                                              onPressed:
-                                                  _darDislike, // Conectamos la nueva función
-                                            ),
-                                          ],
-                                        )
-                                      : null,
-                                ),
-                              );
-                            },
+                        decoration: InputDecoration(
+                          hintText: "Ingresa una canción",
+                          hintStyle: TextStyle(
+                            color: Variables.textos_primarios.withOpacity(0.5),
                           ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // ============================================================
-                // BLOQUE 3: BOTÓN CERRAR SALA
-                // ============================================================
-                SizedBox(
-                  width: 150,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[900],
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(34),
-                      ),
-                    ),
-                    label: Text(
-                      "Cerrar Sala",
-                      style: GoogleFonts.comfortaa(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    onPressed: () async {
-                      await FirebaseFirestore.instance
-                          .collection('salas')
-                          .doc(widget.codigoSala)
-                          .delete(); // Borra la sala de Firebase al salir
-                      // Regresa a la pantalla anterior (login)
-                      _cerrarSala();
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          //PARA MIS TAACK
-          // ── CAPA 2: ALERTA DE ÉXITO FLOTANTE ────────────────────────────────
-          if (_mostrarAlertaExito)
-            Positioned(
-              top: 50,
-              left: 14,
-              right: 14,
-              bottom: 40,
-              child: IgnorePointer(
-                child: Container(
-                  color: Colors.black.withOpacity(0.4),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 30,
-                        vertical: 20,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF001A1A),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Variables.textos_primarios,
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Variables.textos_primarios.withOpacity(0.2),
-                            blurRadius: 15,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.check_circle,
+                          //Para poner el icono a la izquierda
+                          prefixIcon: Icon(
+                            Icons.search,
                             color: Variables.textos_primarios,
-                            size: 60,
                           ),
-                          const SizedBox(height: 15),
-                          Text(
-                            "¡Añadida a la cola!",
-                            style: GoogleFonts.comfortaa(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                          //Para poner el icono a la derecha
+                          suffixIcon: mostrarequis
+                              ? IconButton(
+                                  icon: Icon(Icons.close),
+                                  color: Variables.textos_primarios,
+                                  onPressed: () {
+                                    _buscadorController.clear();
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: Colors.black.withOpacity(0.2),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(25),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(25),
+                            borderSide: BorderSide(
+                              color: Variables.textos_primarios.withOpacity(0.4),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(25),
+                            borderSide: BorderSide(
+                              color: Variables.textos_primarios,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                              
+                    // ── RESULTADOS DE BÚSQUEDA (Condicional) ────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.only(top: 15, bottom: 15),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          SizedBox(
+                            height: 40,
+                            child: ElevatedButton(
+                              onPressed: () {},
+                              style: Variables.estiloBotones,
+                              child: Padding(
+                                padding: const EdgeInsets.all(10),
+                                child: Text(
+                                  "ID: ${widget.codigoSala}",
+                                  style: const TextStyle(fontSize: 18),
+                                ),
+                              ),
+                            ),
+                          ),
+                              
+                          SizedBox(
+                            height: 40,
+                            child: ElevatedButton.icon(
+                              onPressed: _mostrarUsuariosEnLinea,
+                              
+                              style: Variables.estiloBotones,
+                              icon: const Icon(Icons.person),
+                              label: Text(
+                                "$usuariosEnLinea",
+                                style: TextStyle(fontSize: 18),
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                ),
-              ),
-            ),
-          if (_buscadorController.text.isNotEmpty)
-            Positioned(
-              top: 50,
-              left: 14,
-              right: 14,
-              bottom: 40,
-
-              child: Container(
-                color: Variables.fondoInferior,
-
-                child: _buscandoApi
-                    ? Center(
-                        child: CircularProgressIndicator(
-                          color: Variables.textos_primarios,
-                        ),
-                      )
-                    : _resultadosBusqueda.isNotEmpty
-                    ? ListView.builder(
-                        itemCount: _resultadosBusqueda.length,
-                        itemBuilder: (context, index) {
-                          final cancion = _resultadosBusqueda[index];
-                          return Card(
-                            color: Colors.black.withOpacity(0.3),
-                            margin: const EdgeInsets.symmetric(vertical: 5),
-                            child: ListTile(
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  cancion['urlImagen'],
-                                  width: 45,
-                                  height: 45,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                              title: Text(
-                                cancion['titulo'],
-                                style: GoogleFonts.comfortaa(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Text(
-                                cancion['artista'],
-                                style: GoogleFonts.comfortaa(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              trailing: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Variables.fondoBotones
-                                      .withOpacity(0.2),
-                                  foregroundColor: Variables.textos_primarios,
-                                ),
-                                onPressed: () => _agregarCancion(cancion['id']),
-                                child: const Text("Añadir"),
+                              
+                    // ============================================================
+                    // BLOQUE 1: REPRODUCTOR ACTUAL
+                    // ============================================================
+                    Column(
+                      children: [
+                        // Portada de la canción
+                        SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            width: 180,
+                            height: 180,
+                            color: Colors.grey[900],
+                            child: Image.network(
+                              imagen,
+                              fit: BoxFit.cover,
+                              // Si la imagen falla, muestra un icono
+                              errorBuilder: (_, _, _) => const Icon(
+                                Icons.album,
+                                color: Colors.white54,
+                                size: 80,
                               ),
                             ),
-                          );
-                        },
-                      )
-                    : Center(
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                              
+                        // Título
+                        Text(
+                          titulo,
+                          style: GoogleFonts.comfortaa(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                              
+                        const SizedBox(height: 4),
+                              
+                        // Artista
+                        Text(
+                          artista,
+                          style: GoogleFonts.comfortaa(
+                            color: Colors.grey,
+                            fontSize: 15,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                              
+                        SizedBox(height: 4),
+                              
+                        Text(
+                          "Dislikes requeridos para saltar: ${_dislikesRequeridos.toString()}",
+                          style: GoogleFonts.comfortaa(
+                            color: Variables.textos_primarios,
+                          ),
+                        ),
+                              
+                        const SizedBox(height: 3),
+                              
+                        // Barra de progreso
+                        Slider(
+                          value: progresoCancion,
+                          onChanged: (value) {},
+                          activeColor: Variables.textos_primarios,
+                        ),
+                      ],
+                    ),
+                              
+                    const SizedBox(height: 5),
+                              
+                    // Separador visual
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
                         child: Text(
-                          "No se encontraron canciones",
-                          style: GoogleFonts.comfortaa(color: Colors.grey),
+                          "Lista de reproducción",
+                          style: GoogleFonts.comfortaa(
+                            color: Variables.textos_primarios,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
+                    ),
+                              
+                    // ============================================================
+                    // BLOQUE 2: COLA DE CANCIONES
+                    // ============================================================
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: listaColaEspera.isEmpty
+                            ? Center(
+                                child: Text(
+                                  "La cola está vacía, ¡añade canciones!",
+                                  style: GoogleFonts.comfortaa(
+                                    color: Variables.textos_primarios.withOpacity(
+                                      0.4,
+                                    ),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                              //Le dice al listview builder que ocupe el espacio que ocupen sus elemento osea se usa dentro de un singlechildscrollview sino se expnadira infinitamente
+                              //shrinkWrap: true,
+                              //Desactiva el scroll de la lista
+                              //physics: NeverScrollableScrollPhysics(),
+                                itemCount: listaColaEspera.length,
+                                itemBuilder: (context, index) {
+                                  final cancionCola = listaColaEspera[index];
+                                  final bool esLaQueEstaSonando = (index == 0);
+                                  //print("La lista de canciones son: $cancionCola");
+                              
+                                  return Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      vertical: 4,
+                                      horizontal: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: esLaQueEstaSonando
+                                          ? const Color(0xFF0D2A2A)
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: esLaQueEstaSonando
+                                          ? Border.all(
+                                              color: const Color(
+                                                0xFF00FFCC,
+                                              ).withOpacity(0.5),
+                                              width: 1,
+                                            )
+                                          : null,
+                                    ),
+                                    child: ListTile(
+                                      leading: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: cancionCola['imagen'] != ''
+                                            ? Image.network(
+                                                cancionCola['imagen'],
+                                                width: 45,
+                                                height: 45,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, _, _) =>
+                                                    _iconoMusica(
+                                                      esLaQueEstaSonando,
+                                                    ),
+                                              )
+                                            : _iconoMusica(esLaQueEstaSonando),
+                                      ),
+                                      title: Text(
+                                        cancionCola['titulo'],
+                                        style: GoogleFonts.comfortaa(
+                                          color: esLaQueEstaSonando
+                                              ? Colors.white
+                                              : Colors.white70,
+                                          fontWeight: esLaQueEstaSonando
+                                              ? FontWeight.bold
+                                              : FontWeight.w500,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        cancionCola['artista'],
+                                        style: GoogleFonts.comfortaa(
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      trailing: esLaQueEstaSonando
+                                          ? Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                // Mostramos visualmente el progreso, ej: "1/3"
+                                                Text(
+                                                  "${_usuariosDislike.length}/$_dislikesRequeridos",
+                                                  style: const TextStyle(
+                                                    color: Colors.redAccent,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
+                                                IconButton(
+                                                  // Si el usuario ya está en la lista, mostramos el ícono relleno, sino el delineado
+                                                  icon: Icon(
+                                                    _usuariosDislike.contains(
+                                                          widget
+                                                              .nombreUsuarioActual,
+                                                        )
+                                                        ? Icons.thumb_down
+                                                        : Icons
+                                                              .thumb_down_off_alt,
+                                                    color: Colors.red,
+                                                    size: 26,
+                                                  ),
+                                                  onPressed:
+                                                      _darDislike, // Conectamos la nueva función
+                                                ),
+                                              ],
+                                            )
+                                          : null,
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+                              
+                    const SizedBox(height: 16),
+                              
+                    // ============================================================
+                    // BLOQUE 3: BOTÓN CERRAR SALA
+                    // ============================================================
+                    SizedBox(
+                      //Sirve para poner el ancho de un widget al porcentaje total de una pantalla
+                      width: MediaQuery.of(context).size.width * 0.5,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red[900],
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(34),
+                          ),
+                        ),
+                        label: Text(
+                          "Cerrar Sala",
+                          style: GoogleFonts.comfortaa(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: () async {
+                          await FirebaseFirestore.instance
+                              .collection('salas')
+                              .doc(widget.codigoSala)
+                              .delete(); // Borra la sala de Firebase al salir
+                          // Regresa a la pantalla anterior (login)
+                          _cerrarSala();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-        ],
+            
+            //PARA MIS TAACK
+            if (_buscadorController.text.isNotEmpty)
+              Positioned(
+                top: 75,
+                left: 14,
+                right: 14,
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Variables.fondoBotones,
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+
+                  child: _buscandoApi
+                      ? Center(
+                          child: CircularProgressIndicator(
+                            color: Variables.textos_primarios,
+                          ),
+                        )
+                      : _resultadosBusqueda.isNotEmpty
+                      ? ListView.builder(
+                          itemCount: _resultadosBusqueda.length,
+                          itemBuilder: (context, index) {
+                            final cancion = _resultadosBusqueda[index];
+                            return Card(
+                              color: Colors.black.withOpacity(0.3),
+                              //margin: const EdgeInsets.symmetric(vertical: 5),
+                              child: ListTile(
+                                leading: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    cancion['urlImagen'],
+                                    width: 45,
+                                    height: 45,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                title: Text(
+                                  cancion['titulo'],
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.comfortaa(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  cancion['artista'],
+                                  style: GoogleFonts.comfortaa(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                trailing: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Variables.fondoBotones,
+
+                                    foregroundColor: Variables.textos_primarios,
+                                  ),
+                                  onPressed: () =>
+                                      _agregarCancion(cancion['id']),
+                                  child: Text("Añadir"),
+                                ),
+                              ),
+                            );
+                          },
+                        )
+                      : Center(
+                          child: Text(
+                            "No se encontraron canciones",
+                            style: GoogleFonts.comfortaa(color: Colors.grey),
+                          ),
+                        ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

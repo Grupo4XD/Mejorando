@@ -68,6 +68,7 @@ class _PantallaNameState extends State<PantallaName> {
                 ),
               ),
             ),
+            
             const SizedBox(height: 30),
             
             // Botón para continuar

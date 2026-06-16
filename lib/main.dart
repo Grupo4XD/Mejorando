@@ -18,7 +18,6 @@ class MainApp extends StatelessWidget {
       home: Scaffold(
         // Permite que el contenido del body se extienda detrás del AppBar
         extendBodyBehindAppBar: true,
-        appBar: Variables.MiAppbar,
         body: Container(
           width: double.infinity,
           height: double.infinity,

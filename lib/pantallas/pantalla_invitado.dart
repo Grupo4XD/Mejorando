@@ -15,9 +15,11 @@ class _PantallaInvitadoState extends State<PantallaInvitado> {
   // Dos controladores: uno para el apodo y otro para el código de 4 dígitos
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _codigoController = TextEditingController();
+
   bool _cargando = false;
 
   @override
+  //Cuando se destruye la pantalla esto se ejecuta y evita la fuga de memoria
   void dispose() {
     _nameController.dispose();
     _codigoController.dispose();
@@ -103,91 +105,93 @@ class _PantallaInvitadoState extends State<PantallaInvitado> {
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: SingleChildScrollView(
-          // Evita errores de pantalla si se abre el teclado
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 40),
-              Text(
-                'Unirse a una Sala',
-                style: GoogleFonts.comfortaa(
-                  color: Variables.textos_primarios,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 30),
-
-              // TextField para el nombre
-              TextField(
-                controller: _nameController,
-                style: GoogleFonts.comfortaa(color: Variables.textos_primarios),
-                decoration: InputDecoration(
-                  hintText: "Tu nombre de usuario",
-                  hintStyle: TextStyle(
-                    color: Variables.textos_primarios.withOpacity(0.4),
+        child: Center(
+          child: SingleChildScrollView(
+            // Evita errores de pantalla si se abre el teclado
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                
+                Text(
+                  'Unirse a una Sala',
+                  style: GoogleFonts.comfortaa(
+                    color: Variables.textos_primarios,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(25),
-                    borderSide: BorderSide(
+                ),
+                const SizedBox(height: 30),
+          
+                // TextField para el nombre
+                TextField(
+                  controller: _nameController,
+                  style: GoogleFonts.comfortaa(color: Variables.textos_primarios),
+                  decoration: InputDecoration(
+                    hintText: "Tu nombre de usuario",
+                    hintStyle: TextStyle(
                       color: Variables.textos_primarios.withOpacity(0.4),
                     ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(25),
-                    borderSide: const BorderSide(
-                      color: Variables.textos_primarios,
-                      width: 2,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: BorderSide(
+                        color: Variables.textos_primarios.withOpacity(0.4),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: const BorderSide(
+                        color: Variables.textos_primarios,
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              // TextField para el código de sala
-              TextField(
-                controller: _codigoController,
-                keyboardType:
-                    TextInputType.number, // Muestra el teclado numérico
-                style: GoogleFonts.comfortaa(color: Variables.textos_primarios),
-                decoration: InputDecoration(
-                  hintText: "Código de la sala (4 dígitos)",
-                  hintStyle: TextStyle(
-                    color: Variables.textos_primarios.withOpacity(0.4),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(25),
-                    borderSide: BorderSide(
+                const SizedBox(height: 20),
+          
+                // TextField para el código de sala
+                TextField(
+                  controller: _codigoController,
+                  keyboardType:
+                      TextInputType.number, // Muestra el teclado numérico
+                  style: GoogleFonts.comfortaa(color: Variables.textos_primarios),
+                  decoration: InputDecoration(
+                    hintText: "Código de la sala (4 dígitos)",
+                    hintStyle: TextStyle(
                       color: Variables.textos_primarios.withOpacity(0.4),
                     ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(25),
-                    borderSide: const BorderSide(
-                      color: Variables.textos_primarios,
-                      width: 2,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: BorderSide(
+                        color: Variables.textos_primarios.withOpacity(0.4),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: const BorderSide(
+                        color: Variables.textos_primarios,
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 40),
-
-              // Botón Unirme
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _cargando ? null : _unirseALaSala,
-                  style: Variables.estiloBotones,
-                  child: _cargando
-                      ? const CircularProgressIndicator(
-                          color: Variables.textos_primarios,
-                        )
-                      : const Text('Unirme a Sala'),
+                const SizedBox(height: 40),
+          
+                // Botón Unirme
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _cargando ? null : _unirseALaSala,
+                    style: Variables.estiloBotones,
+                    child: _cargando
+                        ? const CircularProgressIndicator(
+                            color: Variables.textos_primarios,
+                          )
+                        : const Text('Unirme a Sala'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
