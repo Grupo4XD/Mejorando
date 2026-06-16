@@ -23,8 +23,11 @@ class PantallaSala extends StatefulWidget {
 
 class _PantallaSalaState extends State<PantallaSala> {
   String _tokenActual = ''; // <-- Almacenará el token de forma interna
+
   List<String> _usuariosDislike =
       []; // <-- Guardará los nombres de quienes dieron dislike
+  //###### PARA RASTREAR LA CANCION QUE ESTA SONANDO #######
+  String _idCancionActual = ''; // <-- Rastreará qué canción está sonando
 
   // ── VARIABLES DEL BUSCADOR ──────────────────────────────────────────
   final TextEditingController _buscadorController = TextEditingController();
@@ -130,6 +133,31 @@ class _PantallaSalaState extends State<PantallaSala> {
     setState(() {
       // ── Actualizar reproductor central ──────────────────────────────
       if (datosCancion != null) {
+        // 1. Extraemos el ID único de la canción que viene de Spotify
+        final nuevoId = datosCancion['item']['id'] ?? '';
+
+        // 2. DETECTOR DE CAMBIO: Si ya teníamos una canción y el ID es diferente, ¡cambió la música!
+        if (_idCancionActual.isNotEmpty && _idCancionActual != nuevoId) {
+          // Limpiamos los dislikes en pantalla al instante
+          setState(() {
+            _usuariosDislike.clear();
+          });
+
+          // Solo el CREADOR limpia Firebase (para que no lo hagan los 10 invitados a la vez)
+          bool esCreador =
+              _nombresUsuarios.isNotEmpty &&
+              widget.nombreUsuarioActual == _nombresUsuarios[0];
+          if (esCreador) {
+            FirebaseFirestore.instance
+                .collection('salas')
+                .doc(widget.codigoSala)
+                .update({'usuarios_dislike': []});
+          }
+        }
+
+        // 3. Guardamos el nuevo ID para la próxima comprobación
+        _idCancionActual = nuevoId;
+
         titulo = datosCancion['item']['name'] ?? 'Sin título';
 
         // Los artistas vienen como lista; los unimos con coma
@@ -243,6 +271,10 @@ class _PantallaSalaState extends State<PantallaSala> {
                 // Leemos la lista de dislikes. Si no existe, usamos una lista vacía.
                 final List<dynamic> dislikes = datos['usuarios_dislike'] ?? [];
                 _usuariosDislike = List<String>.from(dislikes);
+
+                print(
+                  "La cantidad de dislikes que se encontraron por defecto fueron $_usuariosDislike",
+                );
 
                 // Actualizamos el token dinámicamente (vital para los invitados)
                 _tokenActual = datos['spotify_access_token'] ?? '';
@@ -443,7 +475,6 @@ class _PantallaSalaState extends State<PantallaSala> {
 
   //############## BOTON PARA DAR DISLIKES #########################
   Future<void> _darDislike() async {
-    // 1. Verificamos si el usuario ya votó
     if (_usuariosDislike.contains(widget.nombreUsuarioActual)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ya diste dislike a esta canción')),
@@ -451,35 +482,40 @@ class _PantallaSalaState extends State<PantallaSala> {
       return;
     }
 
-    // Referencia a nuestra sala en Firestore
     DocumentReference salaRef = FirebaseFirestore.instance
         .collection('salas')
         .doc(widget.codigoSala);
 
-    // 2. Agregamos el nombre del usuario a la lista de dislikes
-    await salaRef.update({
-      'usuarios_dislike': FieldValue.arrayUnion([widget.nombreUsuarioActual]),
-    });
-
-    // 3. Verificamos si con este nuevo voto alcanzamos la meta
-    // (Sumamos 1 porque la lista local tardará unos milisegundos en actualizarse desde Firebase)
+    // EVALUACIÓN ANTICIPADA: ¿Con este voto alcanzamos el límite necesario?
     if (_usuariosDislike.length + 1 >= _dislikesRequeridos) {
+      // 1. Limpiamos LOCALMENTE de inmediato para que tu pantalla se actualice sin demoras
+      setState(() {
+        _usuariosDislike.clear();
+      });
+
+      // 2. Reseteamos la base de datos a vacío (no agregamos el voto, directo limpiamos)
+      await salaRef.update({'usuarios_dislike': []});
+
       print("⏭️ ¡Límite de dislikes alcanzado! Saltando canción...");
 
-      // Llamamos a tu API para saltar la canción (cualquiera puede hacerlo porque todos comparten _tokenActual)
+      // 3. Mandamos la orden a Spotify
       bool exito = await Peticionesapi.saltarSiguienteCancion(_tokenActual);
 
       if (exito) {
-        // Vaciamos la lista de dislikes en Firebase para la nueva canción
-        await salaRef.update({
-          'usuarios_dislike': [], // Lo sobreescribimos con un arreglo vacío
-        });
-
-        // Refrescamos el reproductor de inmediato
-        _actualizarReproductor();
-      } else {
-        print("❌ Error al intentar saltar la canción en Spotify");
+        _actualizarReproductor(); // Traemos los datos de la nueva canción
       }
+    } else {
+      // SI NO ES EL ÚLTIMO VOTO, simplemente sumamos a la persona a la lista
+
+      // Actualización optimista local
+      setState(() {
+        _usuariosDislike.add(widget.nombreUsuarioActual);
+      });
+
+      // Actualización en Firebase
+      await salaRef.update({
+        'usuarios_dislike': FieldValue.arrayUnion([widget.nombreUsuarioActual]),
+      });
     }
   }
 
@@ -494,7 +530,7 @@ class _PantallaSalaState extends State<PantallaSala> {
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 16.0,
-              vertical: 35.0,
+              vertical: 15.0,
             ),
             child: Column(
               children: [
@@ -702,7 +738,7 @@ class _PantallaSalaState extends State<PantallaSala> {
                             itemBuilder: (context, index) {
                               final cancionCola = listaColaEspera[index];
                               final bool esLaQueEstaSonando = (index == 0);
-                              print("La lista de canciones son: $cancionCola");
+                              //print("La lista de canciones son: $cancionCola");
 
                               return Container(
                                 margin: const EdgeInsets.symmetric(
