@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:proyecto_rockify/main.dart';
 import 'package:proyecto_rockify/pantallas/pantalla_Inicio.dart';
 import 'package:proyecto_rockify/widgets/variables.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -155,6 +154,7 @@ class _PantallaSalaState extends State<PantallaSala> {
           });
 
           // Solo el CREADOR limpia Firebase (para que no lo hagan los 10 invitados a la vez)
+
           bool esCreador =
               _nombresUsuarios.isNotEmpty &&
               widget.nombreUsuarioActual == _nombresUsuarios[0];
@@ -295,25 +295,52 @@ class _PantallaSalaState extends State<PantallaSala> {
         });
   }
 
-  // ── CERRAR SALA: borra el doc de Firestore y vuelve a PantallaInicio ─
+  // ── CERRAR SALA: borra el doc de Firestore o elimina al invitado ─
   Future<void> _cerrarSala() async {
     _timer?.cancel();
     _streamUsuarios?.cancel();
 
-    // Borra el documento de la sala en Firestore
-    await FirebaseFirestore.instance
-        .collection('salas')
-        .doc(widget.codigoSala)
-        .delete();
+    // Verificamos de forma segura si el usuario actual es el creador
+
+    bool esCreador =
+        _nombresUsuarios.isNotEmpty &&
+        widget.nombreUsuarioActual == _nombresUsuarios[0];
+
+    try {
+      print("EL CREADOR DICE QUE ES $esCreador");
+      if (esCreador) {
+        // 1. EL CREADOR DESTRUYE LA SALA
+        print("👑 El creador cerró la sala. Borrando documento...");
+        await FirebaseFirestore.instance
+            .collection('salas')
+            .doc(widget.codigoSala)
+            .delete();
+      } else {
+        // 2. EL INVITADO SE RETIRA DE LA SALA
+        print("🚶‍♂️ Un invitado salió. Borrando sus datos de la sala...");
+        await FirebaseFirestore.instance
+            .collection('salas')
+            .doc(widget.codigoSala)
+            .update({
+              // Lo quitamos de la lista de conectados
+              'usuarios': FieldValue.arrayRemove([widget.nombreUsuarioActual]),
+              // Lo quitamos de los dislikes por si había votado
+              'usuarios_dislike': FieldValue.arrayRemove([
+                widget.nombreUsuarioActual,
+              ]),
+            });
+      }
+    } catch (e) {
+      print("Error al cerrar sala/salir: $e");
+    }
 
     if (!mounted) return;
 
     // Navega a PantallaInicio limpiando todo el stack de navegación
-    //Elimina todas las pantallas del stack
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => PantallaInicio()),
-      (route) => false, // Elimina todas las pantallas anteriores
+      MaterialPageRoute(builder: (context) => const PantallaInicio()),
+      (route) => false,
     );
   }
 
@@ -394,7 +421,7 @@ class _PantallaSalaState extends State<PantallaSala> {
                           },
                         ),
                       ),
-                  
+
                       // --- CONFIGURACIÓN  DE DISLIKES ---
                       if (esCreador) ...[
                         const Divider(
@@ -415,7 +442,6 @@ class _PantallaSalaState extends State<PantallaSala> {
                           children: [
                             //Expanded le dara todo el espacio nesesario a lo widgets para que se acomoden
                             Expanded(
-
                               child: const Text(
                                 "Dislikes para pasar:",
                                 style: TextStyle(color: Colors.white),
@@ -494,6 +520,7 @@ class _PantallaSalaState extends State<PantallaSala> {
 
   //############## BOTON PARA DAR DISLIKES #########################
   Future<void> _darDislike() async {
+    // 1. Verificamos si el usuario ya votó
     if (_usuariosDislike.contains(widget.nombreUsuarioActual)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ya diste dislike a esta canción')),
@@ -505,33 +532,37 @@ class _PantallaSalaState extends State<PantallaSala> {
         .collection('salas')
         .doc(widget.codigoSala);
 
-    // EVALUACIÓN ANTICIPADA: ¿Con este voto alcanzamos el límite necesario?
-    if (_usuariosDislike.length + 1 >= _dislikesRequeridos) {
-      // 1. Limpiamos LOCALMENTE de inmediato para que tu pantalla se actualice sin demoras
-      setState(() {
-        _usuariosDislike.clear();
-      });
+    // 2. ACTUALIZACIÓN VISUAL INMEDIATA (Para todos los casos)
+    // Agregamos al usuario localmente primero para que el botón se pinte de rojo AL INSTANTE
+    setState(() {
+      _usuariosDislike.add(widget.nombreUsuarioActual);
+    });
 
-      // 2. Reseteamos la base de datos a vacío (no agregamos el voto, directo limpiamos)
-      await salaRef.update({'usuarios_dislike': []});
+    // 3. EVALUACIÓN: ¿Con este voto (que ya está en la lista) alcanzamos el límite?
+    // Nota: Como ya lo agregamos arriba, ya no sumamos "+ 1", solo comparamos la longitud real
+    if (_usuariosDislike.length >= _dislikesRequeridos) {
+      // LA MAGIA DE LA UX: Esperamos medio segundo (500 milisegundos)
+      // Esto le da tiempo al usuario de ver el botón rojo y el "2/2" antes de que la canción desaparezca
+      await Future.delayed(const Duration(milliseconds: 500));
 
       print("⏭️ ¡Límite de dislikes alcanzado! Saltando canción...");
 
-      // 3. Mandamos la orden a Spotify
+      // Reseteamos la base de datos a vacío para la próxima canción
+      await salaRef.update({'usuarios_dislike': []});
+
+      // Mandamos la orden a Spotify
       bool exito = await Peticionesapi.saltarSiguienteCancion(_tokenActual);
 
       if (exito) {
-        _actualizarReproductor(); // Traemos los datos de la nueva canción
+        // Limpiamos la pantalla localmente y traemos la nueva canción
+        setState(() {
+          _usuariosDislike.clear();
+        });
+        _actualizarReproductor();
       }
     } else {
-      // SI NO ES EL ÚLTIMO VOTO, simplemente sumamos a la persona a la lista
-
-      // Actualización optimista local
-      setState(() {
-        _usuariosDislike.add(widget.nombreUsuarioActual);
-      });
-
-      // Actualización en Firebase
+      // SI NO ES EL ÚLTIMO VOTO, simplemente guardamos este voto en Firebase
+      // (Visualmente ya se actualizó en el paso 2)
       await salaRef.update({
         'usuarios_dislike': FieldValue.arrayUnion([widget.nombreUsuarioActual]),
       });
@@ -540,17 +571,26 @@ class _PantallaSalaState extends State<PantallaSala> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      backgroundColor: Variables.fondoInferior,
-
-      //###################### BUSCADOR ##################
-      //Safe area detecta la muesca de camara del telefono o su barra de notificaciones y le da un area segura para delimitar el espacio
-      body: SafeArea(
-        child: Stack(
-          children: [
-            //Identifica si todo el contenido cabe en la pantalla sino activa un scrolling
-           
+    //El popscope sirve para que no haga retroceso con las siguiente propiedades
+    return PopScope(
+      canPop: false, // Bloqueamos el retroceso automático
+      // ignore: deprecated_member_use
+      onPopInvoked: (bool didPop) async {
+        if (didPop) return; // Si ya hizo pop, no hacemos nada
+        // ¡Ejecutamos TU función que ya tiene toda la lógica de limpiar Firebase!
+        await _cerrarSala(); 
+      },
+      child: Scaffold(
+        //Hace que el teclado no empuje todo hacia arriab y que vaya por encima
+        resizeToAvoidBottomInset: false,
+        backgroundColor: Variables.fondoInferior,
+      
+        //###################### BUSCADOR ##################
+        //Safe area detecta la muesca de camara del telefono o su barra de notificaciones y le da un area segura para delimitar el espacio
+        body: SafeArea(
+          child: Stack(
+            children: [
+              //Identifica si todo el contenido cabe en la pantalla sino activa un scrolling
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16.0,
@@ -586,6 +626,7 @@ class _PantallaSalaState extends State<PantallaSala> {
                                   color: Variables.textos_primarios,
                                   onPressed: () {
                                     _buscadorController.clear();
+                                    mostrarequis = false;
                                   },
                                 )
                               : null,
@@ -611,7 +652,7 @@ class _PantallaSalaState extends State<PantallaSala> {
                         ),
                       ),
                     ),
-                              
+      
                     // ── RESULTADOS DE BÚSQUEDA (Condicional) ────────────────────────
                     Padding(
                       padding: const EdgeInsets.only(top: 15, bottom: 15),
@@ -632,12 +673,12 @@ class _PantallaSalaState extends State<PantallaSala> {
                               ),
                             ),
                           ),
-                              
+      
                           SizedBox(
                             height: 40,
                             child: ElevatedButton.icon(
                               onPressed: _mostrarUsuariosEnLinea,
-                              
+      
                               style: Variables.estiloBotones,
                               icon: const Icon(Icons.person),
                               label: Text(
@@ -649,7 +690,7 @@ class _PantallaSalaState extends State<PantallaSala> {
                         ],
                       ),
                     ),
-                              
+      
                     // ============================================================
                     // BLOQUE 1: REPRODUCTOR ACTUAL
                     // ============================================================
@@ -676,7 +717,7 @@ class _PantallaSalaState extends State<PantallaSala> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                              
+      
                         // Título
                         Text(
                           titulo,
@@ -689,9 +730,9 @@ class _PantallaSalaState extends State<PantallaSala> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                              
+      
                         const SizedBox(height: 4),
-                              
+      
                         // Artista
                         Text(
                           artista,
@@ -701,18 +742,18 @@ class _PantallaSalaState extends State<PantallaSala> {
                           ),
                           textAlign: TextAlign.center,
                         ),
-                              
+      
                         SizedBox(height: 4),
-                              
+      
                         Text(
                           "Dislikes requeridos para saltar: ${_dislikesRequeridos.toString()}",
                           style: GoogleFonts.comfortaa(
                             color: Variables.textos_primarios,
                           ),
                         ),
-                              
+      
                         const SizedBox(height: 3),
-                              
+      
                         // Barra de progreso
                         Slider(
                           value: progresoCancion,
@@ -721,9 +762,9 @@ class _PantallaSalaState extends State<PantallaSala> {
                         ),
                       ],
                     ),
-                              
+      
                     const SizedBox(height: 5),
-                              
+      
                     // Separador visual
                     Align(
                       alignment: Alignment.centerLeft,
@@ -739,7 +780,7 @@ class _PantallaSalaState extends State<PantallaSala> {
                         ),
                       ),
                     ),
-                              
+      
                     // ============================================================
                     // BLOQUE 2: COLA DE CANCIONES
                     // ============================================================
@@ -762,16 +803,16 @@ class _PantallaSalaState extends State<PantallaSala> {
                                 ),
                               )
                             : ListView.builder(
-                              //Le dice al listview builder que ocupe el espacio que ocupen sus elemento osea se usa dentro de un singlechildscrollview sino se expnadira infinitamente
-                              //shrinkWrap: true,
-                              //Desactiva el scroll de la lista
-                              //physics: NeverScrollableScrollPhysics(),
+                                //Le dice al listview builder que ocupe el espacio que ocupen sus elemento osea se usa dentro de un singlechildscrollview sino se expnadira infinitamente
+                                //shrinkWrap: true,
+                                //Desactiva el scroll de la lista
+                                //physics: NeverScrollableScrollPhysics(),
                                 itemCount: listaColaEspera.length,
                                 itemBuilder: (context, index) {
                                   final cancionCola = listaColaEspera[index];
                                   final bool esLaQueEstaSonando = (index == 0);
                                   //print("La lista de canciones son: $cancionCola");
-                              
+      
                                   return Container(
                                     margin: const EdgeInsets.symmetric(
                                       vertical: 4,
@@ -817,6 +858,8 @@ class _PantallaSalaState extends State<PantallaSala> {
                                               ? FontWeight.bold
                                               : FontWeight.w500,
                                         ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                       subtitle: Text(
                                         cancionCola['artista'],
@@ -862,9 +905,9 @@ class _PantallaSalaState extends State<PantallaSala> {
                               ),
                       ),
                     ),
-                              
+      
                     const SizedBox(height: 16),
-                              
+      
                     // ============================================================
                     // BLOQUE 3: BOTÓN CERRAR SALA
                     // ============================================================
@@ -890,10 +933,11 @@ class _PantallaSalaState extends State<PantallaSala> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         onPressed: () async {
-                          await FirebaseFirestore.instance
-                              .collection('salas')
-                              .doc(widget.codigoSala)
-                              .delete(); // Borra la sala de Firebase al salir
+                          //await FirebaseFirestore.instance
+                            //  .collection('salas')
+                              //.doc(widget.codigoSala)
+                              //.delete(); 
+                              //// Borra la sala de Firebase al salir
                           // Regresa a la pantalla anterior (login)
                           _cerrarSala();
                         },
@@ -902,85 +946,90 @@ class _PantallaSalaState extends State<PantallaSala> {
                   ],
                 ),
               ),
-            
-            //PARA MIS TAACK
-            if (_buscadorController.text.isNotEmpty)
-              Positioned(
-                top: 75,
-                left: 14,
-                right: 14,
-                child: Container(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Variables.fondoBotones,
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-
-                  child: _buscandoApi
-                      ? Center(
-                          child: CircularProgressIndicator(
-                            color: Variables.textos_primarios,
+      
+              //PARA MIS TAACK
+              if (_buscadorController.text.isNotEmpty)
+                Positioned(
+                  top: 75,
+                  left: 14,
+                  right: 14,
+                  child: Container(
+                    //Con esto podemosdarle un alto fijo de acuerdo al procentaje de la pantalla
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Variables.fondoBotones,
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+      
+                    child: _buscandoApi
+                        ? Center(
+                            child: CircularProgressIndicator(
+                              color: Variables.textos_primarios,
+                            ),
+                          )
+                        : _resultadosBusqueda.isNotEmpty
+                        ? ListView.builder(
+                            itemCount: _resultadosBusqueda.length,
+                            itemBuilder: (context, index) {
+                              final cancion = _resultadosBusqueda[index];
+                              return Card(
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.zero,
+                                ),
+                                color: Colors.transparent,
+                                margin: const EdgeInsets.symmetric(vertical: 0),
+                                child: ListTile(
+                                  leading: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      cancion['urlImagen'],
+                                      width: 45,
+                                      height: 45,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    cancion['titulo'],
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.comfortaa(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    cancion['artista'],
+                                    style: GoogleFonts.comfortaa(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  trailing: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Variables.fondoBotones,
+      
+                                      foregroundColor: Variables.textos_primarios,
+                                    ),
+                                    onPressed: () =>
+                                        _agregarCancion(cancion['id']),
+                                    child: Text("Añadir"),
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : Center(
+                            child: Text(
+                              "No se encontraron canciones",
+                              style: GoogleFonts.comfortaa(color: Colors.grey),
+                            ),
                           ),
-                        )
-                      : _resultadosBusqueda.isNotEmpty
-                      ? ListView.builder(
-                          itemCount: _resultadosBusqueda.length,
-                          itemBuilder: (context, index) {
-                            final cancion = _resultadosBusqueda[index];
-                            return Card(
-                              color: Colors.black.withOpacity(0.3),
-                              //margin: const EdgeInsets.symmetric(vertical: 5),
-                              child: ListTile(
-                                leading: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    cancion['urlImagen'],
-                                    width: 45,
-                                    height: 45,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                title: Text(
-                                  cancion['titulo'],
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.comfortaa(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  cancion['artista'],
-                                  style: GoogleFonts.comfortaa(
-                                    color: Colors.grey,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                trailing: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Variables.fondoBotones,
-
-                                    foregroundColor: Variables.textos_primarios,
-                                  ),
-                                  onPressed: () =>
-                                      _agregarCancion(cancion['id']),
-                                  child: Text("Añadir"),
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                      : Center(
-                          child: Text(
-                            "No se encontraron canciones",
-                            style: GoogleFonts.comfortaa(color: Colors.grey),
-                          ),
-                        ),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

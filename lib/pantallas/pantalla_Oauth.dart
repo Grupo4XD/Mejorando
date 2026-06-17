@@ -43,7 +43,6 @@ class _PantallaOauthState extends State<PantallaOauth> {
           ),
         ),
       );
-      
     } else {
       setState(() {
         cargando = false;
@@ -84,19 +83,50 @@ class _PantallaOauthState extends State<PantallaOauth> {
         final datosJson = jsonDecode(respuesta.body);
         String token = datosJson['access_token'];
         String refreshToken = datosJson['refresh_token'];
+
+        print("👤 Obteniendo identidad del usuario en Spotify...");
+
+        // 1. NUEVO: Le pedimos a Spotify el perfil del usuario usando su token
+        final respuestaPerfil = await http.get(
+          Uri.parse('https://api.spotify.com/v1/me'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+
+        String spotifyId = 'desconocido';
+
+        if (respuestaPerfil.statusCode == 200) {
+          spotifyId = jsonDecode(respuestaPerfil.body)['id'];
+          print("🆔 ID de Spotify detectado: $spotifyId");
+        }
+
+        // 2. NUEVO: Buscamos si este usuario ya tenía una sala abierta y la eliminamos
+        if (spotifyId != 'desconocido') {
+          final salasAnteriores = await FirebaseFirestore.instance
+              .collection('salas')
+              .where('spotify_id', isEqualTo: spotifyId) // Buscamos su ID
+              .get();
+
+          for (var doc in salasAnteriores.docs) {
+            await doc.reference.delete(); // Borramos la sala vieja
+            print("🗑️ Sala antigua huérfana eliminada: ${doc.id}");
+          }
+        }
+
+        // 3. Generamos el nuevo código de sala y lo guardamos
         String codigoSala = (1000 + Random().nextInt(9000)).toString();
+        print("🏠 Creando NUEVA sala con código: $codigoSala");
 
-        print("🏠 Creando sala con código: $codigoSala");
-
-        // Cambiamos la estructura para usar un Array de Firestore
-        await FirebaseFirestore.instance.collection('salas').doc(codigoSala).set({
-          'codigo_sala': codigoSala,
-          'spotify_access_token': token,
-          'spotify_refresh_token': refreshToken,
-          // Guardamos al creador como el primer integrante de la lista de usuarios conectados
-          'usuarios': [widget.nombreUsuario],
-          'creado_en': FieldValue.serverTimestamp(),
-        });
+        await FirebaseFirestore.instance
+            .collection('salas')
+            .doc(codigoSala)
+            .set({
+              'codigo_sala': codigoSala,
+              'spotify_access_token': token,
+              'spotify_refresh_token': refreshToken,
+              'spotify_id': spotifyId, // <-- Guardamos su ID de Spotify aquí
+              'usuarios': [widget.nombreUsuario],
+              'creado_en': FieldValue.serverTimestamp(),
+            });
 
         print("✅ Sala creada en Firestore");
         return {"token": token, "codigoSala": codigoSala};
