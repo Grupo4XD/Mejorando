@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:proyecto_rockify/widgets/disenios.dart';
 
 class Variables {
   static const Color textos_primarios = Colors.tealAccent;
@@ -14,14 +15,26 @@ class Variables {
   static final estiloBotones = ElevatedButton.styleFrom(
     padding: EdgeInsets.zero,
     elevation: 2,
-    foregroundColor: Variables.textos_primarios,
     textStyle: Variables.estiloTextoBotones,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-    backgroundColor: Variables.fondoBotones,
+    backgroundColor: Disenos.colorVerdeNeon,
+    foregroundColor: Colors.black,
   );
 
-
-
+  //Fondo de mi body
+  static const BoxDecoration fondobody = BoxDecoration(
+    gradient: RadialGradient(
+      center: Alignment.center, // El punto de origen del gradiente
+      radius:
+          1.2, // Qué tanto se expande (1.2 cubre toda la pantalla suavemente)
+      colors: [
+        Color(0xFF141E30), // El azul oscuro/marino del centro
+        Color(0xFF070B14), // El negro profundo de los bordes
+      ],
+      stops: [0.3, 1.0], // Controla dónde empieza a oscurecerse
+    ),
+  );
+  
   //El appBar
 
   static final AppBar MiAppbar = AppBar(

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:proyecto_rockify/pantallas/pantalla_Sala.dart';
+import 'package:proyecto_rockify/widgets/disenios.dart';
 import 'package:proyecto_rockify/widgets/variables.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:http/http.dart' as http;
@@ -181,25 +182,31 @@ class _PantallaOauthState extends State<PantallaOauth> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF001A1A), // Tu fondo oscuro de Rockola
-      body: cargando
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    color: Color(0xFF00FFCC), // Tu color cian brillante
-                  ),
-                  SizedBox(height: 20),
-                  Text(
-                    "Cargando sala",
-                    style: GoogleFonts.comfortaa(
-                      color: Variables.textos_primarios,
+      body: Container(
+       
+        decoration: Variables.fondobody,
+        child: cargando
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: Disenos.colorVerdeNeon, // Tu color cian brillante
                     ),
-                  ),
-                ],
-              ),
-            )
-          : WebViewWidget(controller: _controller),
+                    SizedBox(height: 20),
+                    Text(
+                      "Cargando sala",
+                      style: GoogleFonts.comfortaa(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : WebViewWidget(controller: _controller),
+      ),
     );
   }
 }
