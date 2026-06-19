@@ -22,11 +22,19 @@ class PantallaSala extends StatefulWidget {
   State<PantallaSala> createState() => _PantallaSalaState();
 }
 
-//El WidgetsBindingObserver es el vigilante del SO que esuchca cuando la app esta apunto de destruirse
+//El WidgetsBindingObserver es el vigilante del SO que escuhca cuando la app esta apunto de destruirse
 class _PantallaSalaState extends State<PantallaSala>
     with WidgetsBindingObserver {
+  bool _saltandoCancion = false;
+  // Variables para la alerta flotante
+  bool _mostrarAlertaDislike = false;
+  String _mensajeAlerta = "";
+
   //Para mostrar la quis en el buscador
+
   bool mostrarequis = false;
+  //Para mostrar las alertas de dislike
+  //List<dynamic> _dislikesAnteriores = [];
 
   String _tokenActual = ''; // <-- Almacenará el token de forma interna
 
@@ -55,7 +63,7 @@ class _PantallaSalaState extends State<PantallaSala>
   int usuariosEnLinea = 1;
   StreamSubscription<DocumentSnapshot>? _streamUsuarios;
 
-  //############## Mostrar usaurios y dislikes
+  //############## Mostrar usuarios y dislikes
   List<String> _nombresUsuarios =
       []; // <-- Guardará todos los nombres de la sala
   int _dislikesRequeridos =
@@ -65,6 +73,36 @@ class _PantallaSalaState extends State<PantallaSala>
   List<Map<String, dynamic>> listaColaEspera = [];
 
   Timer? _timer;
+  //FUNCION PARA EJECUTAR EL SALTO
+  Future<void> _ejecutarSaltoSincronizado() async {
+    if (_saltandoCancion) return; // Evita que se dispare dos veces
+    _saltandoCancion = true;
+
+    // 1. TODOS LOS CELULARES ESPERAN 1 SEGUNDO Y VEN EL VOTO
+    await Future.delayed(const Duration(seconds: 1));
+
+    // 2. SOLO EL CREADOR HACE EL TRABAJO DE LIMPIAR Y SALTAR
+    // (Para que no manden 10 órdenes a Spotify al mismo tiempo)
+    bool esCreador =
+        _nombresUsuarios.isNotEmpty &&
+        widget.nombreUsuarioActual == _nombresUsuarios[0];
+
+    if (esCreador) {
+      await FirebaseFirestore.instance
+          .collection('salas')
+          .doc(widget.codigoSala)
+          .update({
+            'usuarios_dislike': [], // Limpiamos la base de datos
+          });
+
+      bool exito = await Peticionesapi.saltarSiguienteCancion(_tokenActual);
+      if (exito) {
+        _actualizarReproductor();
+      }
+    }
+
+    _saltandoCancion = false;
+  }
 
   // ── MÉTODOS DEL BUSCADOR ────────────────────────────────────────────
   void _alEscribirTexto(String texto) {
@@ -260,7 +298,7 @@ class _PantallaSalaState extends State<PantallaSala>
     _actualizarReproductor();
 
     // Temporizador cada 3 segundos usando nuestra variable interna
-    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
       _actualizarReproductor();
     });
 
@@ -291,6 +329,13 @@ class _PantallaSalaState extends State<PantallaSala>
                 // Leemos la lista de dislikes. Si no existe, usamos una lista vacía.
                 final List<dynamic> dislikes = datos['usuarios_dislike'] ?? [];
                 _usuariosDislike = List<String>.from(dislikes);
+                // (Dentro de tu Stream, después de que recibes los datos de Firebase y haces el setState)
+
+                // ######### NUEVA LÓGICA DE SALTO SINCRONIZADO #########
+                if (_usuariosDislike.length >= _dislikesRequeridos &&
+                    _dislikesRequeridos > 0) {
+                  _ejecutarSaltoSincronizado();
+                }
 
                 print(
                   "La cantidad de dislikes que se encontraron por defecto fueron $_usuariosDislike",
@@ -405,9 +450,9 @@ class _PantallaSalaState extends State<PantallaSala>
     //Si la aplicacion se destruye entonces apagamos al vigilante
     WidgetsBinding.instance.removeObserver(this);
     // Cancelar el timer cuando el widget se destruye (usuario sale de la sala)
-
     _timer?.cancel();
     _streamUsuarios?.cancel();
+
     super.dispose();
   }
 
@@ -426,15 +471,12 @@ class _PantallaSalaState extends State<PantallaSala>
                 widget.nombreUsuarioActual == _nombresUsuarios[0];
 
             return AlertDialog(
-              shape:RoundedRectangleBorder(
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadiusGeometry.circular(15),
-                side: BorderSide(
-                  color: Disenos.colorVerdeNeon,
-                  width: 2
-                )
+                side: BorderSide(color: Disenos.colorVerdeNeon, width: 2),
               ),
               backgroundColor: Disenos.colorFondoInferior,
-              
+
               title: Text(
                 "Usuarios en la Sala",
                 style: GoogleFonts.comfortaa(
@@ -485,7 +527,7 @@ class _PantallaSalaState extends State<PantallaSala>
                           },
                         ),
                       ),
-            
+
                       // --- CONFIGURACIÓN  DE DISLIKES ---
                       if (esCreador) ...[
                         const Divider(
@@ -584,51 +626,42 @@ class _PantallaSalaState extends State<PantallaSala>
 
   //############## BOTON PARA DAR DISLIKES #########################
   Future<void> _darDislike() async {
-    // 1. Verificamos si el usuario ya votó
-    if (_usuariosDislike.contains(widget.nombreUsuarioActual)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ya diste dislike a esta canción')),
-      );
-      return;
-    }
+    // Si ya votó, no hacemos nada
+    if (_usuariosDislike.contains(widget.nombreUsuarioActual)) return;
 
-    DocumentReference salaRef = FirebaseFirestore.instance
-        .collection('salas')
-        .doc(widget.codigoSala);
-
-    // 2. ACTUALIZACIÓN VISUAL INMEDIATA (Para todos los casos)
-    // Agregamos al usuario localmente primero para que el botón se pinte de rojo AL INSTANTE
+    // ACTUALIZACIÓN VISUAL INMEDIATA LOCAL
     setState(() {
       _usuariosDislike.add(widget.nombreUsuarioActual);
     });
 
-    // 3. EVALUACIÓN: ¿Con este voto (que ya está en la lista) alcanzamos el límite?
-    // Nota: Como ya lo agregamos arriba, ya no sumamos "+ 1", solo comparamos la longitud real
-    if (_usuariosDislike.length >= _dislikesRequeridos) {
-      // LA MAGIA DE LA UX: Esperamos medio segundo (500 milisegundos)
-      // Esto le da tiempo al usuario de ver el botón rojo y el "2/2" antes de que la canción desaparezca
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      print("⏭️ ¡Límite de dislikes alcanzado! Saltando canción...");
-
-      // Reseteamos la base de datos a vacío para la próxima canción
-      await salaRef.update({'usuarios_dislike': []});
-
-      // Mandamos la orden a Spotify
-      bool exito = await Peticionesapi.saltarSiguienteCancion(_tokenActual);
-
-      if (exito) {
-        // Limpiamos la pantalla localmente y traemos la nueva canción
-        setState(() {
-          _usuariosDislike.clear();
+    // SOLO SUBIMOS EL VOTO A FIREBASE
+    // El Stream se encargará del resto para todos los celulares
+    await FirebaseFirestore.instance
+        .collection('salas')
+        .doc(widget.codigoSala)
+        .update({
+          'usuarios_dislike': FieldValue.arrayUnion([
+            widget.nombreUsuarioActual,
+          ]),
         });
-        _actualizarReproductor();
-      }
-    } else {
-      // SI NO ES EL ÚLTIMO VOTO, simplemente guardamos este voto en Firebase
-      // (Visualmente ya se actualizó en el paso 2)
-      await salaRef.update({
-        'usuarios_dislike': FieldValue.arrayUnion([widget.nombreUsuarioActual]),
+  }
+
+  //Funcion para lanzar la ventana flotante
+  void _lanzarAlertaFlotante(String nombre) async {
+    // 1. Encendemos la alerta con el nombre del usuario
+    setState(() {
+      _mensajeAlerta = "$nombre le dio dislike 👎";
+      _mostrarAlertaDislike = true;
+    });
+
+    // 2. Esperamos 2 segundos
+    await Future.delayed(const Duration(seconds: 2));
+
+    // 3. Apagamos la alerta (verificando que la pantalla siga viva)
+    //Mounted verifica que la pantalla aun esta viva
+    if (mounted) {
+      setState(() {
+        _mostrarAlertaDislike = false;
       });
     }
   }
@@ -683,7 +716,7 @@ class _PantallaSalaState extends State<PantallaSala>
                           ),
                         ),
                       ),
-          
+
                       Padding(
                         padding: const EdgeInsets.only(top: 15, bottom: 15),
                         child: Row(
@@ -703,7 +736,7 @@ class _PantallaSalaState extends State<PantallaSala>
                                 ),
                               ),
                             ),
-          
+
                             Container(
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(50),
@@ -727,7 +760,7 @@ class _PantallaSalaState extends State<PantallaSala>
                                 height: 40,
                                 child: ElevatedButton.icon(
                                   onPressed: _mostrarUsuariosEnLinea,
-          
+
                                   style: Variables.estiloBotones,
                                   icon: const Icon(Icons.person),
                                   label: Text(
@@ -740,7 +773,7 @@ class _PantallaSalaState extends State<PantallaSala>
                           ],
                         ),
                       ),
-          
+
                       // ============================================================
                       // BLOQUE 1: REPRODUCTOR ACTUAL
                       // ============================================================
@@ -752,14 +785,6 @@ class _PantallaSalaState extends State<PantallaSala>
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(16),
                               color: Colors.black,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Disenos.colorVerdeNeon.withOpacity(0.5),
-                                  blurRadius: 10,
-                                  spreadRadius: 8,
-                                  offset: const Offset(0, 0),
-                                ),
-                              ],
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(16),
@@ -770,7 +795,7 @@ class _PantallaSalaState extends State<PantallaSala>
                                 child: Image.network(
                                   imagen,
                                   fit: BoxFit.cover,
-                                  // Si la imagen falla, muestra un icono
+                                  // Si la imagen  falla, muestra un icono
                                   errorBuilder: (_, _, _) => const Icon(
                                     Icons.album,
                                     color: Colors.white54,
@@ -781,7 +806,7 @@ class _PantallaSalaState extends State<PantallaSala>
                             ),
                           ),
                           const SizedBox(height: 16),
-          
+
                           // Título
                           Text(
                             titulo,
@@ -794,9 +819,9 @@ class _PantallaSalaState extends State<PantallaSala>
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-          
+
                           const SizedBox(height: 4),
-          
+
                           // Artista
                           Text(
                             artista,
@@ -806,18 +831,18 @@ class _PantallaSalaState extends State<PantallaSala>
                             ),
                             textAlign: TextAlign.center,
                           ),
-          
+
                           SizedBox(height: 4),
-          
+
                           Text(
                             "Dislikes requeridos para saltar: ${_dislikesRequeridos.toString()}",
                             style: GoogleFonts.comfortaa(
                               color: Disenos.colorVerdeNeon,
                             ),
                           ),
-          
+
                           const SizedBox(height: 3),
-          
+
                           // Barra de progreso
                           Slider(
                             value: progresoCancion,
@@ -826,14 +851,17 @@ class _PantallaSalaState extends State<PantallaSala>
                           ),
                         ],
                       ),
-          
+
                       const SizedBox(height: 5),
-          
+
                       // Separador visual
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Padding(
-                          padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+                          padding: const EdgeInsets.only(
+                            left: 8.0,
+                            bottom: 8.0,
+                          ),
                           child: Text(
                             "Lista de reproducción",
                             style: GoogleFonts.comfortaa(
@@ -844,8 +872,8 @@ class _PantallaSalaState extends State<PantallaSala>
                           ),
                         ),
                       ),
-          
-                      SizedBox(height: 5,),
+
+                      SizedBox(height: 5),
                       // ============================================================
                       // BLOQUE 2: COLA DE CANCIONES
                       // ============================================================
@@ -874,17 +902,17 @@ class _PantallaSalaState extends State<PantallaSala>
                                   itemCount: listaColaEspera.length,
                                   itemBuilder: (context, index) {
                                     final cancionCola = listaColaEspera[index];
-                                    final bool esLaQueEstaSonando = (index == 0);
+                                    final bool esLaQueEstaSonando =
+                                        (index == 0);
                                     //print("La lista de canciones son: $cancionCola");
-          
+
                                     return Container(
                                       margin: const EdgeInsets.symmetric(
                                         vertical: 2,
                                         horizontal: 6,
                                       ),
-                                      
+
                                       decoration: BoxDecoration(
-                                        
                                         boxShadow: esLaQueEstaSonando
                                             ? [
                                                 BoxShadow(
@@ -915,7 +943,9 @@ class _PantallaSalaState extends State<PantallaSala>
                                       ),
                                       child: ListTile(
                                         leading: ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                           child: cancionCola['imagen'] != ''
                                               ? Image.network(
                                                   cancionCola['imagen'],
@@ -927,7 +957,9 @@ class _PantallaSalaState extends State<PantallaSala>
                                                         esLaQueEstaSonando,
                                                       ),
                                                 )
-                                              : _iconoMusica(esLaQueEstaSonando),
+                                              : _iconoMusica(
+                                                  esLaQueEstaSonando,
+                                                ),
                                         ),
                                         title: Text(
                                           cancionCola['titulo'],
@@ -957,7 +989,8 @@ class _PantallaSalaState extends State<PantallaSala>
                                                     "${_usuariosDislike.length}/$_dislikesRequeridos",
                                                     style: const TextStyle(
                                                       color: Colors.redAccent,
-                                                      fontWeight: FontWeight.bold,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                       fontSize: 16,
                                                     ),
                                                   ),
@@ -986,9 +1019,9 @@ class _PantallaSalaState extends State<PantallaSala>
                                 ),
                         ),
                       ),
-          
+
                       const SizedBox(height: 16),
-          
+
                       // ============================================================
                       // BLOQUE 3: BOTÓN CERRAR SALA
                       // ============================================================
@@ -1027,7 +1060,7 @@ class _PantallaSalaState extends State<PantallaSala>
                     ],
                   ),
                 ),
-          
+
                 //PARA MIS TRACK
                 if (_buscadorController.text.isNotEmpty)
                   Positioned(
@@ -1043,11 +1076,11 @@ class _PantallaSalaState extends State<PantallaSala>
                         color: Disenos.colorFondoInferior,
                         borderRadius: BorderRadius.circular(22),
                         //border: Border.all(
-                          //color: Disenos.colorVerdeNeon,
-                           // width: 2
+                        //color: Disenos.colorVerdeNeon,
+                        // width: 2
                         //)
                       ),
-          
+
                       child: _buscandoApi
                           ? Center(
                               child: CircularProgressIndicator(
@@ -1064,7 +1097,9 @@ class _PantallaSalaState extends State<PantallaSala>
                                     borderRadius: BorderRadius.circular(15),
                                   ),
                                   color: Colors.transparent,
-                                  margin: const EdgeInsets.symmetric(vertical: 0),
+                                  margin: const EdgeInsets.symmetric(
+                                    vertical: 0,
+                                  ),
                                   child: ListTile(
                                     leading: ClipRRect(
                                       borderRadius: BorderRadius.circular(8),
@@ -1094,7 +1129,7 @@ class _PantallaSalaState extends State<PantallaSala>
                                     trailing: ElevatedButton(
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Disenos.colorVerdeNeon,
-          
+
                                         foregroundColor:
                                             Disenos.colorFondoInferior,
                                       ),
@@ -1109,11 +1144,57 @@ class _PantallaSalaState extends State<PantallaSala>
                           : Center(
                               child: Text(
                                 "No se encontraron canciones",
-                                style: GoogleFonts.comfortaa(color: Colors.grey),
+                                style: GoogleFonts.comfortaa(
+                                  color: Colors.grey,
+                                ),
                               ),
                             ),
                     ),
                   ),
+
+                // ── CAPA 3: ALERTA FLOTANTE DE DISLIKE ───────────────────────
+                // IgnorePointer evita que la alerta bloquee los toques en la pantalla
+                IgnorePointer(
+                  ignoring: !_mostrarAlertaDislike,
+                  child: Align(
+                    alignment: Alignment.center, // Aparecerá justo en el medio
+                    child: AnimatedOpacity(
+                      opacity: _mostrarAlertaDislike ? 1.0 : 0.0,
+                      duration: const Duration(
+                        milliseconds: 400,
+                      ), // Transición súper fluida
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF141E30).withOpacity(0.95),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color: Colors.redAccent.withOpacity(0.5),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.redAccent.withOpacity(0.2),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _mensajeAlerta,
+                          style: GoogleFonts.comfortaa(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

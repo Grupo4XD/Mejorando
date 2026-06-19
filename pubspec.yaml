@@ -19,8 +19,14 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: "^0.13.1" # Añade esta línea
 
 flutter:
   uses-material-design: true
   assets:
     - assets/imagenes/
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/imagenes/logo_app.png" # La ruta a tu nuevo logo
