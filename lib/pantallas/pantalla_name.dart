@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:proyecto_rockify/pantallas/pantalla_Oauth.dart';
 import 'package:proyecto_rockify/widgets/variables.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:proyecto_rockify/widgets/disenios.dart';
 
 class PantallaName extends StatefulWidget {

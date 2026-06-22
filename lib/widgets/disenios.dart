@@ -5,7 +5,7 @@ class Disenos {
   // --- COLORES BASE ---
   static const Color colorVerdeNeon = Color(
     0xFF1DB954,
-  ); // Verde tipo Spotify/Rockify
+  );
   static const Color colorFondoSuperior = Color(0xFF0F172A); // Azul oscuro
   static const Color colorFondoInferior = Color(0xFF000000); // Negro profundo
 

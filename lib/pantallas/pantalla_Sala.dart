@@ -25,6 +25,7 @@ class PantallaSala extends StatefulWidget {
 //El WidgetsBindingObserver es el vigilante del SO que escuhca cuando la app esta apunto de destruirse
 class _PantallaSalaState extends State<PantallaSala>
     with WidgetsBindingObserver {
+  List<String> _dislikesAnteriores = []; // <-- Memoria fotográfica de los votos
   bool _saltandoCancion = false;
   // Variables para la alerta flotante
   bool _mostrarAlertaDislike = false;
@@ -88,11 +89,16 @@ class _PantallaSalaState extends State<PantallaSala>
         widget.nombreUsuarioActual == _nombresUsuarios[0];
 
     if (esCreador) {
+      // Calculamos una nueva hora de muerte (4 horas a partir de ESTE momento)
+      DateTime nuevaHoraDeMuerte = DateTime.now().add(const Duration(hours: 4));
+
       await FirebaseFirestore.instance
           .collection('salas')
           .doc(widget.codigoSala)
           .update({
             'usuarios_dislike': [], // Limpiamos la base de datos
+            // ¡LA MAGIA AQUÍ! Reiniciamos el contador de inactividad de Firebase
+            'expira_en': Timestamp.fromDate(nuevaHoraDeMuerte),
           });
 
       bool exito = await Peticionesapi.saltarSiguienteCancion(_tokenActual);
@@ -327,11 +333,28 @@ class _PantallaSalaState extends State<PantallaSala>
                 _dislikesRequeridos = datos['dislikes_requeridos'] ?? 1;
 
                 // Leemos la lista de dislikes. Si no existe, usamos una lista vacía.
-                final List<dynamic> dislikes = datos['usuarios_dislike'] ?? [];
-                _usuariosDislike = List<String>.from(dislikes);
-                // (Dentro de tu Stream, después de que recibes los datos de Firebase y haces el setState)
+                final List<dynamic> dislikesData =
+                    datos['usuarios_dislike'] ?? [];
+                List<String> dislikesNuevos = List<String>.from(dislikesData);
 
-                // ######### NUEVA LÓGICA DE SALTO SINCRONIZADO #########
+                // NUEVO: EL DETECTOR DE VOTOS REMOTOS
+                // Revisamos a cada persona en la nueva lista
+                for (String votante in dislikesNuevos) {
+                  // Si esta persona NO estaba en nuestra memoria anterior, y NO eres tú mismo
+                  if (!_dislikesAnteriores.contains(votante) &&
+                      votante != widget.nombreUsuarioActual) {
+                    // ¡Encontramos un nuevo voto de un amigo! Disparamos su alerta
+                    _lanzarAlertaFlotante(votante);
+                  }
+                }
+
+                // Actualizamos nuestras variables oficiales
+                _dislikesAnteriores = List.from(
+                  dislikesNuevos,
+                ); // Guardamos la nueva foto
+                _usuariosDislike = dislikesNuevos;
+
+                // ######### LÓGICA DE SALTO SINCRONIZADO #########
                 if (_usuariosDislike.length >= _dislikesRequeridos &&
                     _dislikesRequeridos > 0) {
                   _ejecutarSaltoSincronizado();
@@ -415,33 +438,39 @@ class _PantallaSalaState extends State<PantallaSala>
   //ESTA FUNCION ES LA QUE MAS IMPORTA,
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Si la app está a punto de ser destruida (detached) o pausada (cerrada de golpe)
-    if (state == AppLifecycleState.detached ||
-        state == AppLifecycleState.paused) {
-      bool esCreador =
-          _nombresUsuarios.isNotEmpty &&
-          widget.nombreUsuarioActual == _nombresUsuarios[0];
+    // Verificamos si es un invitado
+    bool esCreador =
+        _nombresUsuarios.isNotEmpty &&
+        widget.nombreUsuarioActual == _nombresUsuarios[0];
 
-      // Si es un INVITADO, mandamos un borrado rápido a Firebase en el último milisegundo
-      if (!esCreador) {
-        print("🚨 El sistema mató la app. Borrando al invitado fantasma...");
+    if (!esCreador) {
+      print("El estado es: $state");
+
+      if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.detached) {
+        // 1. EL USUARIO MINIMIZÓ LA APP O LA MATÓ
+        // Lo borramos inmediatamente de Firebase por precaución.
+        // Como la app aún está viva en 'paused', esta petición SÍ tiene tiempo de llegar a Firebase.
+        print("⏸️ Invitado minimizó o cerró la app. Retirando de la sala...");
         FirebaseFirestore.instance
             .collection('salas')
             .doc(widget.codigoSala)
             .update({
               'usuarios': FieldValue.arrayRemove([widget.nombreUsuarioActual]),
-              'usuarios_dislike': FieldValue.arrayRemove([
-                widget.nombreUsuarioActual,
-              ]),
+              // Opcional: También podrías remover su dislike aquí si lo deseas
             });
-      } else {
-        print("EL CREADOR SE SALIO, BORRANDO LA SALA");
-        _cerrarSala();
+        //Se activa solo si fue paused
+      } else if (state == AppLifecycleState.resumed) {
+        // 2. EL USUARIO VOLVIÓ DE WHATSAPP
+        // La app volvió al primer plano. Lo reincorporamos a la lista silenciosamente.
+        print("▶️ Invitado regresó a la app. Reincorporando a la sala...");
+        FirebaseFirestore.instance
+            .collection('salas')
+            .doc(widget.codigoSala)
+            .update({
+              'usuarios': FieldValue.arrayUnion([widget.nombreUsuarioActual]),
+            });
       }
-
-      // (Si es el creador, podríamos borrar la sala aquí también, pero a veces el creador
-      // solo minimiza la app para contestar un WhatsApp, así que es mejor solo limpiar invitados
-      // o dejar que el sistema TTL de Firebase borre la sala horas después).
     }
   }
 
@@ -493,36 +522,122 @@ class _PantallaSalaState extends State<PantallaSala>
                     children: [
                       // --- LISTA DE USUARIOS ---
                       Container(
+                        //Hace que el contenedor ocupe un alto maximo de solo 200 pixeles y no superar esta cantidad es fija
                         constraints: const BoxConstraints(maxHeight: 200),
                         child: ListView.builder(
                           shrinkWrap: true,
                           itemCount: _nombresUsuarios.length,
                           itemBuilder: (context, index) {
                             bool esElCreador = index == 0;
-                            return ListTile(
-                              leading: Icon(
-                                esElCreador ? Icons.star : Icons.person,
-                                color: esElCreador
-                                    ? Colors.amber
-                                    : Colors.white70,
-                              ),
-                              title: Text(
-                                _nombresUsuarios[index],
-                                style: GoogleFonts.comfortaa(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              trailing:
-                                  _nombresUsuarios[index] ==
-                                      widget.nombreUsuarioActual
-                                  ? Text(
-                                      "(Tú)",
-                                      style: GoogleFonts.comfortaa(
-                                        color: Disenos.colorVerdeNeon,
+
+                            // 1. CREAMOS UNA VARIABLE LOCAL PARA NO CONFUNDIRNOS
+                            String nombreDelUsuarioEnLaLista =
+                                _nombresUsuarios[index];
+
+                            // 2. ENVOLVEMOS TU LISTTILE CON EL GESTURE DETECTOR
+                            return GestureDetector(
+                              onLongPress: () {
+                                // 3. VALIDACIÓN: Solo el creador puede expulsar, y no puede expulsarse a sí mismo
+                                bool eresCreador =
+                                    _nombresUsuarios.isNotEmpty &&
+                                    widget.nombreUsuarioActual ==
+                                        _nombresUsuarios[0];
+
+                                if (eresCreador &&
+                                    nombreDelUsuarioEnLaLista !=
+                                        widget.nombreUsuarioActual) {
+                                  // 4. MOSTRAMOS EL CARTEL DE CONFIRMACIÓN
+                                  showDialog(
+                                    context:
+                                        context, // Usamos el context de la pantalla
+                                    builder: (contextDialogo) => AlertDialog(
+                                      // Le llamamos contextDialogo para no confundirlo con el de la lista
+                                      backgroundColor: const Color(0xFF141E30),
+                                      title: const Text(
+                                        "Expulsar invitado",
+                                        style: TextStyle(color: Colors.white),
                                       ),
-                                    )
-                                  : null,
+                                      content: Text(
+                                        "¿Quieres eliminar a $nombreDelUsuarioEnLaLista de la sala?",
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(contextDialogo),
+                                          child: const Text(
+                                            "Cancelar",
+                                            style: TextStyle(
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        ),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.redAccent,
+                                          ),
+                                          onPressed: () async {
+                                            // 5. BORRAMOS DE FIREBASE
+                                            await FirebaseFirestore.instance
+                                                .collection('salas')
+                                                .doc(widget.codigoSala)
+                                                .update({
+                                                  'usuarios':
+                                                      FieldValue.arrayRemove([
+                                                        nombreDelUsuarioEnLaLista,
+                                                      ]),
+                                                  'usuarios_dislike':
+                                                      FieldValue.arrayRemove([
+                                                        nombreDelUsuarioEnLaLista,
+                                                      ]),
+                                                });
+
+                                            // 6. CERRAMOS EL CARTELITO DE EXPULSAR
+                                            if (contextDialogo.mounted) {
+                                              Navigator.pop(contextDialogo);
+                                            }
+                                          },
+                                          child: const Text(
+                                            "Expulsar",
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                              },
+
+                              // 7. AQUÍ ESTÁ TU DISEÑO ORIGINAL INTACTO
+                              child: ListTile(
+                                leading: Icon(
+                                  esElCreador ? Icons.star : Icons.person,
+                                  color: esElCreador
+                                      ? Colors.amber
+                                      : Colors.white70,
+                                ),
+                                title: Text(
+                                  nombreDelUsuarioEnLaLista, // Usamos la variable que creamos arriba
+                                  style: GoogleFonts.comfortaa(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                trailing:
+                                    nombreDelUsuarioEnLaLista ==
+                                        widget.nombreUsuarioActual
+                                    ? Text(
+                                        "(Tú)",
+                                        style: GoogleFonts.comfortaa(
+                                          color: Disenos.colorVerdeNeon,
+                                        ),
+                                      )
+                                    : null,
+                              ),
                             );
                           },
                         ),
@@ -627,12 +742,23 @@ class _PantallaSalaState extends State<PantallaSala>
   //############## BOTON PARA DAR DISLIKES #########################
   Future<void> _darDislike() async {
     // Si ya votó, no hacemos nada
-    if (_usuariosDislike.contains(widget.nombreUsuarioActual)) return;
+    if (_usuariosDislike.contains(widget.nombreUsuarioActual)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.blueGrey,
+          content: Text("Ya diste dislike a esta cancion"),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
 
     // ACTUALIZACIÓN VISUAL INMEDIATA LOCAL
     setState(() {
       _usuariosDislike.add(widget.nombreUsuarioActual);
     });
+
+    _lanzarAlertaFlotante(widget.nombreUsuarioActual);
 
     // SOLO SUBIMOS EL VOTO A FIREBASE
     // El Stream se encargará del resto para todos los celulares

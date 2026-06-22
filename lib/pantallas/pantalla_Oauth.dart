@@ -112,6 +112,8 @@ class _PantallaOauthState extends State<PantallaOauth> {
             print("🗑️ Sala antigua huérfana eliminada: ${doc.id}");
           }
         }
+        // Calculamos la hora de expiración: El momento actual + 4 horas
+        DateTime horaDeMuerte = DateTime.now().add(const Duration(hours: 4));
 
         // 3. Generamos el nuevo código de sala y lo guardamos
         String codigoSala = (1000 + Random().nextInt(9000)).toString();
@@ -127,6 +129,8 @@ class _PantallaOauthState extends State<PantallaOauth> {
               'spotify_id': spotifyId, // <-- Guardamos su ID de Spotify aquí
               'usuarios': [widget.nombreUsuario],
               'creado_en': FieldValue.serverTimestamp(),
+              // NUEVO CAMPO: Le decimos a Firebase cuándo destruir esta sala
+              'expira_en': Timestamp.fromDate(horaDeMuerte),
             });
 
         print("✅ Sala creada en Firestore");
@@ -183,7 +187,6 @@ class _PantallaOauthState extends State<PantallaOauth> {
     return Scaffold(
       backgroundColor: const Color(0xFF001A1A), // Tu fondo oscuro de Rockola
       body: Container(
-       
         decoration: Variables.fondobody,
         child: cargando
             ? Center(
@@ -199,7 +202,7 @@ class _PantallaOauthState extends State<PantallaOauth> {
                       style: GoogleFonts.comfortaa(
                         color: Colors.white,
                         fontSize: 20,
-                        fontWeight: FontWeight.bold
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],

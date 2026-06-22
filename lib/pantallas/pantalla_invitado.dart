@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:proyecto_rockify/pantallas/pantalla_Sala.dart';
 import 'package:proyecto_rockify/widgets/disenios.dart';
 import 'package:proyecto_rockify/widgets/variables.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class PantallaInvitado extends StatefulWidget {
   const PantallaInvitado({super.key});
@@ -42,13 +41,14 @@ class _PantallaInvitadoState extends State<PantallaInvitado> {
     setState(() {
       _cargando = true;
     });
-
+  
     try {
       // 1. Buscamos en Firestore si existe un documento con ese código de sala
       DocumentReference salaRef = FirebaseFirestore.instance
           .collection('salas')
           .doc(codigo);
       DocumentSnapshot doc = await salaRef.get();
+      
 
       if (doc.exists) {
         // Extraemos la lista actual de usuarios de la base de datos
