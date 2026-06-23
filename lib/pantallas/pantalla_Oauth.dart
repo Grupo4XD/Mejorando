@@ -117,7 +117,31 @@ class _PantallaOauthState extends State<PantallaOauth> {
 
         // 3. Generamos el nuevo código de sala y lo guardamos
         String codigoSala = (1000 + Random().nextInt(9000)).toString();
+
         print("🏠 Creando NUEVA sala con código: $codigoSala");
+        try {
+          print("🧹 El conserje está buscando salas fantasma...");
+
+          final salasBasura = await FirebaseFirestore.instance
+              .collection('salas')
+              .where('expira_en', isLessThan: Timestamp.now())
+              .limit(5)
+              .get();
+
+          // Si encontró salas viejas, las borra una por una
+          for (var sala in salasBasura.docs) {
+            print("🗑️ Borrando sala huérfana: ${sala.id}");
+            await sala.reference.delete();
+          }
+        } catch (e) {
+          print(
+            "Error en el conserje: $e",
+          ); // Si falla por falta de internet, no pasa nada, la app sigue
+        }
+
+        // 2. AQUÍ SIGUE TU CÓDIGO NORMAL PARA CREAR LA NUEVA SALA...
+        // DateTime horaDeMuerte = DateTime.now().add(const Duration(hours: 4));
+        // String codigoSala = ...
 
         await FirebaseFirestore.instance
             .collection('salas')

@@ -43,7 +43,7 @@ class _PantallaInvitadoState extends State<PantallaInvitado> {
     });
   
     try {
-      // 1. Buscamos en Firestore si existe un documento con ese código de sala
+      // Buscamos en Firestore si existe un documento con ese código de sala
       DocumentReference salaRef = FirebaseFirestore.instance
           .collection('salas')
           .doc(codigo);
