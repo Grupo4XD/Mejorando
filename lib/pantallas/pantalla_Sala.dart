@@ -794,6 +794,38 @@ class _PantallaSalaState extends State<PantallaSala>
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.sizeOf(context);
+    final screenH = screenSize.height;
+    final screenW = screenSize.width;
+
+    // Breakpoints por altura útil de pantalla
+    final bool pantallaCompacta = screenH < 720;
+    final bool pantallaMuyCompacta = screenH < 640;
+
+    // Más espacio vertical para la cola en celulares pequeños
+    final int flexReproductor =
+        pantallaMuyCompacta ? 2 : (pantallaCompacta ? 3 : 4);
+    final int flexCola =
+        pantallaMuyCompacta ? 3 : (pantallaCompacta ? 3 : 2);
+
+    // Portada: ancho relativo con tope máximo de altura
+    final double factorPortada =
+        pantallaMuyCompacta ? 0.50 : (pantallaCompacta ? 0.58 : 0.70);
+    final double maxAlturaPortada = pantallaMuyCompacta
+        ? screenH * 0.20
+        : (pantallaCompacta ? screenH * 0.24 : screenH * 0.30);
+
+    final double tamMiniaturaCola =
+        pantallaMuyCompacta ? 34.0 : (pantallaCompacta ? 40.0 : 45.0);
+    final double tamTitulo =
+        pantallaMuyCompacta ? 15.0 : (pantallaCompacta ? 17.0 : 20.0);
+    final double tamArtista =
+        pantallaMuyCompacta ? 12.0 : (pantallaCompacta ? 13.0 : 15.0);
+    final double espaciadoReproductor = pantallaCompacta ? 6.0 : 16.0;
+    final EdgeInsets paddingPantalla = pantallaCompacta
+        ? const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0)
+        : const EdgeInsets.symmetric(horizontal: 16.0, vertical: 30.0);
+
     //El popscope sirve para que no haga retroceso con las siguiente propiedades
     return PopScope(
       canPop: false, // Bloqueamos el retroceso automático
@@ -819,12 +851,9 @@ class _PantallaSalaState extends State<PantallaSala>
               children: [
                 //Identifica si todo el contenido cabe en la pantalla sino activa un scrolling
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 30.0,
-                  ),
+                  padding: paddingPantalla,
+                  //COLUMN PRINCIPAL
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(
                         height: 45,
@@ -903,79 +932,108 @@ class _PantallaSalaState extends State<PantallaSala>
                       // ============================================================
                       // BLOQUE 1: REPRODUCTOR ACTUAL
                       // ============================================================
-                      Column(
-                        children: [
-                          // Portada de la canción
-                          SizedBox(height: 10),
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              color: Colors.black,
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: SizedBox(
-                                width: 180,
-                                height: 180,
-                                //color: Colors.grey[900],
-                                child: Image.network(
-                                  imagen,
-                                  fit: BoxFit.cover,
-                                  // Si la imagen  falla, muestra un icono
-                                  errorBuilder: (_, _, _) => const Icon(
-                                    Icons.album,
-                                    color: Colors.white54,
-                                    size: 80,
-                                  ),
+
+                      Expanded(
+                        flex: flexReproductor,
+                        child: Column(
+                          children: [
+                            SizedBox(height: pantallaCompacta ? 4 : 10),
+                            Flexible(
+                              child: Center(
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final anchoObjetivo = screenW * factorPortada;
+                                    final altoDisponible = constraints.maxHeight;
+                                    final ladoBase = altoDisponible > 0
+                                        ? anchoObjetivo.clamp(
+                                            100.0,
+                                            altoDisponible,
+                                          )
+                                        : anchoObjetivo;
+                                    final tamPortada =
+                                        ladoBase.clamp(100.0, maxAlturaPortada);
+
+                                    return SizedBox(
+                                      width: tamPortada,
+                                      height: tamPortada,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          color: Colors.black,
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          child: Image.network(
+                                            imagen,
+                                            width: tamPortada,
+                                            height: tamPortada,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, _, _) => Icon(
+                                              Icons.album,
+                                              color: Colors.white54,
+                                              size: tamPortada * 0.35,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
+                            SizedBox(height: espaciadoReproductor),
 
-                          // Título
-                          Text(
-                            titulo,
-                            style: GoogleFonts.comfortaa(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                            // Título
+                            Text(
+                              titulo,
+                              style: GoogleFonts.comfortaa(
+                                color: Colors.white,
+                                fontSize: tamTitulo,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
 
-                          const SizedBox(height: 4),
+                            SizedBox(height: pantallaCompacta ? 2 : 4),
 
-                          // Artista
-                          Text(
-                            artista,
-                            style: GoogleFonts.comfortaa(
-                              color: Colors.grey,
-                              fontSize: 15,
+                            // Artista
+                            Text(
+                              artista,
+                              style: GoogleFonts.comfortaa(
+                                color: Colors.grey,
+                                fontSize: tamArtista,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
 
-                          SizedBox(height: 4),
+                            SizedBox(height: pantallaCompacta ? 2 : 4),
 
-                          Text(
-                            "Dislikes requeridos para saltar: ${_dislikesRequeridos.toString()}",
-                            style: GoogleFonts.comfortaa(
-                              color: Disenos.colorVerdeNeon,
+                            Text(
+                              "Dislikes requeridos para saltar: ${_dislikesRequeridos.toString()}",
+                              style: GoogleFonts.comfortaa(
+                                color: Disenos.colorVerdeNeon,
+                                fontSize: pantallaCompacta ? 11 : 13,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
 
-                          const SizedBox(height: 3),
+                            SizedBox(height: pantallaCompacta ? 0 : 3),
 
-                          // Barra de progreso
-                          Slider(
-                            value: progresoCancion,
-                            onChanged: (value) {},
-                            activeColor: Disenos.colorVerdeNeon,
-                          ),
-                        ],
+                            // Barra de progreso
+                            Slider(
+                              value: progresoCancion,
+                              onChanged: (value) {},
+                              activeColor: Disenos.colorVerdeNeon,
+                            ),
+                          ],
+                        ),
                       ),
 
                       const SizedBox(height: 5),
@@ -1004,6 +1062,7 @@ class _PantallaSalaState extends State<PantallaSala>
                       // BLOQUE 2: COLA DE CANCIONES
                       // ============================================================
                       Expanded(
+                        flex: flexCola,
                         child: Container(
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.15),
@@ -1033,8 +1092,8 @@ class _PantallaSalaState extends State<PantallaSala>
                                     //print("La lista de canciones son: $cancionCola");
 
                                     return Container(
-                                      margin: const EdgeInsets.symmetric(
-                                        vertical: 2,
+                                      margin: EdgeInsets.symmetric(
+                                        vertical: pantallaMuyCompacta ? 1 : 2,
                                         horizontal: 6,
                                       ),
 
@@ -1068,6 +1127,16 @@ class _PantallaSalaState extends State<PantallaSala>
                                             : null,
                                       ),
                                       child: ListTile(
+                                        dense: pantallaCompacta,
+                                        visualDensity: pantallaCompacta
+                                            ? VisualDensity.compact
+                                            : VisualDensity.standard,
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: pantallaMuyCompacta
+                                              ? 0
+                                              : (pantallaCompacta ? 2 : 4),
+                                        ),
                                         leading: ClipRRect(
                                           borderRadius: BorderRadius.circular(
                                             8,
@@ -1075,16 +1144,18 @@ class _PantallaSalaState extends State<PantallaSala>
                                           child: cancionCola['imagen'] != ''
                                               ? Image.network(
                                                   cancionCola['imagen'],
-                                                  width: 45,
-                                                  height: 45,
+                                                  width: tamMiniaturaCola,
+                                                  height: tamMiniaturaCola,
                                                   fit: BoxFit.cover,
                                                   errorBuilder: (_, _, _) =>
                                                       _iconoMusica(
                                                         esLaQueEstaSonando,
+                                                        size: tamMiniaturaCola,
                                                       ),
                                                 )
                                               : _iconoMusica(
                                                   esLaQueEstaSonando,
+                                                  size: tamMiniaturaCola,
                                                 ),
                                         ),
                                         title: Text(
@@ -1096,15 +1167,23 @@ class _PantallaSalaState extends State<PantallaSala>
                                             fontWeight: esLaQueEstaSonando
                                                 ? FontWeight.bold
                                                 : FontWeight.w500,
+                                            fontSize: pantallaCompacta
+                                                ? 13
+                                                : 14,
                                           ),
-                                          maxLines: 2,
+                                          maxLines: pantallaMuyCompacta ? 1 : 2,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         subtitle: Text(
                                           cancionCola['artista'],
                                           style: GoogleFonts.comfortaa(
                                             color: Colors.grey,
+                                            fontSize: pantallaCompacta
+                                                ? 11
+                                                : 12,
                                           ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                         trailing: esLaQueEstaSonando
                                             ? Row(
@@ -1113,14 +1192,19 @@ class _PantallaSalaState extends State<PantallaSala>
                                                   // Mostramos visualmente el progreso, ej: "1/3"
                                                   Text(
                                                     "${_usuariosDislike.length}/$_dislikesRequeridos",
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       color: Colors.redAccent,
                                                       fontWeight:
                                                           FontWeight.bold,
-                                                      fontSize: 16,
+                                                      fontSize: pantallaCompacta
+                                                          ? 13
+                                                          : 16,
                                                     ),
                                                   ),
                                                   IconButton(
+                                                    padding: EdgeInsets.zero,
+                                                    constraints:
+                                                        const BoxConstraints(),
                                                     // Si el usuario ya está en la lista, mostramos el ícono relleno, sino el delineado
                                                     icon: Icon(
                                                       _usuariosDislike.contains(
@@ -1131,7 +1215,9 @@ class _PantallaSalaState extends State<PantallaSala>
                                                           : Icons
                                                                 .thumb_down_off_alt,
                                                       color: Colors.red,
-                                                      size: 26,
+                                                      size: pantallaCompacta
+                                                          ? 22
+                                                          : 26,
                                                     ),
                                                     onPressed:
                                                         _darDislike, // Conectamos la nueva función
@@ -1330,17 +1416,17 @@ class _PantallaSalaState extends State<PantallaSala>
   }
 
   // Widget auxiliar para el icono de música en la lista
-  Widget _iconoMusica(bool destacado) {
+  Widget _iconoMusica(bool destacado, {double size = 45}) {
     return Container(
-      width: 45,
-      height: 45,
+      width: size,
+      height: size,
       color: destacado
           ? const Color(0xFF00FFCC).withOpacity(0.1)
           : Colors.white.withOpacity(0.05),
       child: Icon(
         Icons.music_note,
         color: destacado ? const Color(0xFF00FFCC) : Colors.white54,
-        size: 24,
+        size: size * 0.53,
       ),
     );
   }
