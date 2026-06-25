@@ -612,7 +612,7 @@ class _PantallaSalaState extends State<PantallaSala>
                                 }
                               },
 
-                              // 7. AQUÍ ESTÁ TU DISEÑO ORIGINAL INTACTO
+                              // 7. Diseño original del ListTile
                               child: ListTile(
                                 leading: Icon(
                                   esElCreador ? Icons.star : Icons.person,
@@ -794,15 +794,24 @@ class _PantallaSalaState extends State<PantallaSala>
 
   @override
   Widget build(BuildContext context) {
+    //Tamaño de la pantalla
     final screenSize = MediaQuery.sizeOf(context);
     final screenH = screenSize.height;
     final screenW = screenSize.width;
 
     // Breakpoints por altura útil de pantalla
+    //Puse 720 porque es la altura de la pantalla de un celular de 6.1 pulgadas
     final bool pantallaCompacta = screenH < 720;
+    //Puse 640 porque es la altura de la pantalla de un celular de 5.5 pulgadas
     final bool pantallaMuyCompacta = screenH < 640;
 
     // Más espacio vertical para la cola en celulares pequeños
+    //Flex indica caunto de espacio ocupara el widget en la pantalla
+    //Flex sirve para que el widget se expanda o contraiga segun el tamaño de la pantalla
+    //Flex si es 2, el widget se expandira al doble de su tamaño
+    //Flex si es 3, el widget se expandira al triple de su tamaño
+    //Flex si es 4, el widget se expandira al cuatro de su tamaño
+
     final int flexReproductor =
         pantallaMuyCompacta ? 2 : (pantallaCompacta ? 3 : 4);
     final int flexCola =

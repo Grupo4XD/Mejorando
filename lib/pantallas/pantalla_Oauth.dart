@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:proyecto_rockify/pantallas/pantalla_Inicio.dart';
 import 'package:proyecto_rockify/pantallas/pantalla_Sala.dart';
 import 'package:proyecto_rockify/widgets/disenios.dart';
 import 'package:proyecto_rockify/widgets/variables.dart';
@@ -30,6 +31,19 @@ class _PantallaOauthState extends State<PantallaOauth> {
     );
 
     if (resultado != null && mounted) {
+      // ¡NUEVA LÓGICA AQUÍ!
+      // Verificamos si la función anterior nos devolvió un error (Usuario Free)
+      if (resultado.containsKey('error') && resultado['error'] == true) {
+        setState(() {
+          cargando = false;
+        });
+
+        // Le mostramos un cartel al usuario y lo mandamos a la pantalla de inicio
+        _mostrarErrorPremium(resultado['mensaje']);
+        return; // Detenemos la ejecución de esta función
+      }
+
+      // Si no hay error, el flujo continúa normal (Es Premium)
       String tokencito = resultado['token']!;
       String codigoDeLaSala = resultado['codigoSala']!;
 
@@ -39,7 +53,6 @@ class _PantallaOauthState extends State<PantallaOauth> {
           builder: (context) => PantallaSala(
             token: tokencito,
             codigoSala: codigoDeLaSala,
-            //Pasamos el nombre a la pantalla del usuario
             nombreUsuarioActual: widget.nombreUsuario,
           ),
         ),
@@ -50,6 +63,53 @@ class _PantallaOauthState extends State<PantallaOauth> {
         print("Algo ocurrió mal");
       });
     }
+  }
+
+  // Función para mostrar el cartel si el usuario no es Premium
+  void _mostrarErrorPremium(String mensaje) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Obliga al usuario a tocar el botón
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Disenos.colorFondoSuperior, // Usamos tu paleta
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+            side: BorderSide(color: Colors.redAccent, width: 2),
+          ),
+          title: Text(
+            "Cuenta no compatible",
+            style: GoogleFonts.montserrat(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          
+          content: Text(
+            mensaje,
+            style: GoogleFonts.poppins(color: Colors.white70),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+              ),
+              onPressed: () {
+                // Cerramos el diálogo y enviamos al usuario al principio
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PantallaInicio(),
+                  ),
+                  (route) => false,
+                );
+              },
+              child: Text("Entendido", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // Cambiamos el retorno a Future<String?> por si ocurre un error
@@ -96,8 +156,26 @@ class _PantallaOauthState extends State<PantallaOauth> {
         String spotifyId = 'desconocido';
 
         if (respuestaPerfil.statusCode == 200) {
-          spotifyId = jsonDecode(respuestaPerfil.body)['id'];
+          // Guardamos el JSON decodificado en una variable
+          final perfilData = jsonDecode(respuestaPerfil.body);
+
+          spotifyId = perfilData['id'];
           print("🆔 ID de Spotify detectado: $spotifyId");
+
+          // Leemos el tipo de suscripción del usuario
+          String tipoSuscripcion = perfilData['product'] ?? 'free';
+
+          if (tipoSuscripcion != 'premium') {
+            // El usuario es Free.
+            print("🚫 El usuario es Free. Deteniendo creación de sala.");
+
+            // Devolvemos un mapa especial indicando el error
+            return {
+              "error": true,
+              "mensaje":
+                  "Necesitas Spotify Premium para ser el anfitrión de una sala.",
+            };
+          }
         }
 
         // 2. NUEVO: Buscamos si este usuario ya tenía una sala abierta y la eliminamos
