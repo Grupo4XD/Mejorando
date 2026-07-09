@@ -279,7 +279,7 @@ class _PantallaOauthState extends State<PantallaOauth> {
       )
       ..loadRequest(
         Uri.parse(
-          'https://accounts.spotify.com/authorize?client_id=cf4410e8df834a21998c3fe4d6518987&response_type=code&redirect_uri=https://macrobyte.site&scope=user-modify-playback-state%20user-read-currently-playing%20user-read-playback-state%20user-read-private%20user-read-email',
+          'https://accounts.spotify.com/authorize?client_id=cf4410e8df834a21998c3fe4d6518987&response_type=code&redirect_uri=https://macrobyte.site&scope=user-modify-playback-state%20user-read-currently-playing%20user-read-playback-state%20user-read-private%20user-read-email&show_dialog=true',
         ),
       );
   }
