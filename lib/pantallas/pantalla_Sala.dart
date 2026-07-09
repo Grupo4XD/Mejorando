@@ -485,6 +485,39 @@ class _PantallaSalaState extends State<PantallaSala>
     super.dispose();
   }
 
+  void ConfirmarCerrarSala(){
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: Disenos.colorVerdeNeon,
+              width: 2,
+            ),
+          ),
+          backgroundColor: Colors.black,
+          title: Text("¿Cerrar sala?",style: TextStyle(color: Colors.white),textAlign: TextAlign.center,),
+          content: Text("Si cierras la sala, todos los usuarios serán expulsados",style: ,),
+          actions: [
+            TextButton(
+              onPressed: () => {},
+              child: Text("Cancelar"),
+            ),
+            TextButton(
+              onPressed: () {
+                _cerrarSala();
+               
+              },
+              child: Text("Cerrar"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   //################# FUNCION VENTANA EMERGENTE ##################
   void _mostrarUsuariosEnLinea() {
     showDialog(
@@ -695,6 +728,7 @@ class _PantallaSalaState extends State<PantallaSala>
                                     }
                                   },
                                 ),
+
                                 Text(
                                   "$_dislikesRequeridos",
                                   style: const TextStyle(
@@ -812,24 +846,28 @@ class _PantallaSalaState extends State<PantallaSala>
     //Flex si es 3, el widget se expandira al triple de su tamaño
     //Flex si es 4, el widget se expandira al cuatro de su tamaño
 
-    final int flexReproductor =
-        pantallaMuyCompacta ? 2 : (pantallaCompacta ? 3 : 4);
-    final int flexCola =
-        pantallaMuyCompacta ? 3 : (pantallaCompacta ? 3 : 2);
+    final int flexReproductor = pantallaMuyCompacta
+        ? 2
+        : (pantallaCompacta ? 3 : 4);
+    final int flexCola = pantallaMuyCompacta ? 3 : (pantallaCompacta ? 3 : 2);
 
     // Portada: ancho relativo con tope máximo de altura
-    final double factorPortada =
-        pantallaMuyCompacta ? 0.50 : (pantallaCompacta ? 0.58 : 0.70);
+    final double factorPortada = pantallaMuyCompacta
+        ? 0.50
+        : (pantallaCompacta ? 0.58 : 0.70);
     final double maxAlturaPortada = pantallaMuyCompacta
         ? screenH * 0.20
         : (pantallaCompacta ? screenH * 0.24 : screenH * 0.30);
 
-    final double tamMiniaturaCola =
-        pantallaMuyCompacta ? 34.0 : (pantallaCompacta ? 40.0 : 45.0);
-    final double tamTitulo =
-        pantallaMuyCompacta ? 15.0 : (pantallaCompacta ? 17.0 : 20.0);
-    final double tamArtista =
-        pantallaMuyCompacta ? 12.0 : (pantallaCompacta ? 13.0 : 15.0);
+    final double tamMiniaturaCola = pantallaMuyCompacta
+        ? 34.0
+        : (pantallaCompacta ? 40.0 : 45.0);
+    final double tamTitulo = pantallaMuyCompacta
+        ? 15.0
+        : (pantallaCompacta ? 17.0 : 20.0);
+    final double tamArtista = pantallaMuyCompacta
+        ? 12.0
+        : (pantallaCompacta ? 13.0 : 15.0);
     final double espaciadoReproductor = pantallaCompacta ? 6.0 : 16.0;
     final EdgeInsets paddingPantalla = pantallaCompacta
         ? const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0)
@@ -894,7 +932,7 @@ class _PantallaSalaState extends State<PantallaSala>
                                 child: Padding(
                                   padding: const EdgeInsets.all(10),
                                   child: Text(
-                                    "ID: ${widget.codigoSala}",
+                                    "Sala: ${widget.codigoSala}",
                                     style: const TextStyle(fontSize: 18),
                                   ),
                                 ),
@@ -934,6 +972,31 @@ class _PantallaSalaState extends State<PantallaSala>
                                 ),
                               ),
                             ),
+
+                            SizedBox(
+                              height: 40,
+                              child: ElevatedButton(
+                                onPressed: ConfirmarCerrarSala,
+                                style: Variables.estiloBotones.copyWith(
+                                  foregroundColor: WidgetStateProperty.all(
+                                    Colors.black,
+                                  ),
+                                  backgroundColor: WidgetStateProperty.all(
+                                    Colors.red,
+                                  ),
+                                  padding: WidgetStateProperty.all(
+                                    const EdgeInsets.symmetric(horizontal: 15),
+                                  ),
+                                  //Esta propiedad hace que elimine de 64px el boton puede ser del tamaño del padding que se dicte
+                                  minimumSize: WidgetStateProperty.all(
+                                    Size.zero,
+                                  ),
+                                  //Esta propiedad hace que el boton se adapte al contenido y no ocupe todo el espacio disponible
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Icon(Icons.logout, size: 18),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -941,7 +1004,6 @@ class _PantallaSalaState extends State<PantallaSala>
                       // ============================================================
                       // BLOQUE 1: REPRODUCTOR ACTUAL
                       // ============================================================
-
                       Expanded(
                         flex: flexReproductor,
                         child: Column(
@@ -951,29 +1013,35 @@ class _PantallaSalaState extends State<PantallaSala>
                               child: Center(
                                 child: LayoutBuilder(
                                   builder: (context, constraints) {
-                                    final anchoObjetivo = screenW * factorPortada;
-                                    final altoDisponible = constraints.maxHeight;
+                                    final anchoObjetivo =
+                                        screenW * factorPortada;
+                                    final altoDisponible =
+                                        constraints.maxHeight;
                                     final ladoBase = altoDisponible > 0
                                         ? anchoObjetivo.clamp(
                                             100.0,
                                             altoDisponible,
                                           )
                                         : anchoObjetivo;
-                                    final tamPortada =
-                                        ladoBase.clamp(100.0, maxAlturaPortada);
+                                    final tamPortada = ladoBase.clamp(
+                                      100.0,
+                                      maxAlturaPortada,
+                                    );
 
                                     return SizedBox(
                                       width: tamPortada,
                                       height: tamPortada,
                                       child: Container(
                                         decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(16),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
                                           color: Colors.black,
                                         ),
                                         child: ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(16),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
                                           child: Image.network(
                                             imagen,
                                             width: tamPortada,
@@ -1180,7 +1248,7 @@ class _PantallaSalaState extends State<PantallaSala>
                                                 ? 13
                                                 : 14,
                                           ),
-                                          maxLines: pantallaMuyCompacta ? 1 : 2,
+                                          maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         subtitle: Text(
@@ -1246,7 +1314,7 @@ class _PantallaSalaState extends State<PantallaSala>
                       // ============================================================
                       // BLOQUE 3: BOTÓN CERRAR SALA
                       // ============================================================
-                      SizedBox(
+                      /**SizedBox(
                         //Sirve para poner el ancho de un widget al porcentaje total de una pantalla
                         width: MediaQuery.of(context).size.width * 0.5,
                         height: 50,
@@ -1278,6 +1346,7 @@ class _PantallaSalaState extends State<PantallaSala>
                           },
                         ),
                       ),
+                      **/
                     ],
                   ),
                 ),
