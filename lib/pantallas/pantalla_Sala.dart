@@ -485,34 +485,49 @@ class _PantallaSalaState extends State<PantallaSala>
     super.dispose();
   }
 
-  void ConfirmarCerrarSala(){
+  // ignore: non_constant_identifier_names
+  void ConfirmarCerrarSala() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(
-              color: Disenos.colorVerdeNeon,
-              width: 2,
+        return Center(
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: Disenos.colorVerdeNeon, width: 2),
             ),
+            backgroundColor: Colors.black,
+            title: Text(
+              "¿Salir de la sala?",
+              style: TextStyle(color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
+
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => {Navigator.pop(context)},
+                    child: Text(
+                      "Cancelar",
+                      style: TextStyle(color: Disenos.colorVerdeNeon),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      //Con  parentesis se ejecuta solo cuando preisonamos, si no ponemos parentesis se ejecuta cuando se carga la pantalla, pero si la ponemso dentro del cuerp ode la funcion no se ejecuta aunque pulse el boton
+                      _cerrarSala();
+                    },
+                    child: Text(
+                      "Salir",
+                      style: TextStyle(color: Colors.redAccent),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          backgroundColor: Colors.black,
-          title: Text("¿Cerrar sala?",style: TextStyle(color: Colors.white),textAlign: TextAlign.center,),
-          content: Text("Si cierras la sala, todos los usuarios serán expulsados",style: ,),
-          actions: [
-            TextButton(
-              onPressed: () => {},
-              child: Text("Cancelar"),
-            ),
-            TextButton(
-              onPressed: () {
-                _cerrarSala();
-               
-              },
-              child: Text("Cerrar"),
-            ),
-          ],
         );
       },
     );
@@ -848,16 +863,16 @@ class _PantallaSalaState extends State<PantallaSala>
 
     final int flexReproductor = pantallaMuyCompacta
         ? 2
-        : (pantallaCompacta ? 3 : 4);
+        : (pantallaCompacta ? 3 : 3);
     final int flexCola = pantallaMuyCompacta ? 3 : (pantallaCompacta ? 3 : 2);
 
     // Portada: ancho relativo con tope máximo de altura
     final double factorPortada = pantallaMuyCompacta
         ? 0.50
-        : (pantallaCompacta ? 0.58 : 0.70);
+        : (pantallaCompacta ? 0.58 : 0.55);
     final double maxAlturaPortada = pantallaMuyCompacta
         ? screenH * 0.20
-        : (pantallaCompacta ? screenH * 0.24 : screenH * 0.30);
+        : (pantallaCompacta ? screenH * 0.24 : screenH * 0.22);
 
     final double tamMiniaturaCola = pantallaMuyCompacta
         ? 34.0
@@ -868,7 +883,9 @@ class _PantallaSalaState extends State<PantallaSala>
     final double tamArtista = pantallaMuyCompacta
         ? 12.0
         : (pantallaCompacta ? 13.0 : 15.0);
-    final double espaciadoReproductor = pantallaCompacta ? 6.0 : 16.0;
+
+    final double espaciadoReproductor = pantallaCompacta ? 4.0 : 6.0;
+
     final EdgeInsets paddingPantalla = pantallaCompacta
         ? const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0)
         : const EdgeInsets.symmetric(horizontal: 16.0, vertical: 30.0);
@@ -992,7 +1009,8 @@ class _PantallaSalaState extends State<PantallaSala>
                                     Size.zero,
                                   ),
                                   //Esta propiedad hace que el boton se adapte al contenido y no ocupe todo el espacio disponible
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
                                 ),
                                 child: const Icon(Icons.logout, size: 18),
                               ),
@@ -1060,6 +1078,7 @@ class _PantallaSalaState extends State<PantallaSala>
                                 ),
                               ),
                             ),
+
                             SizedBox(height: espaciadoReproductor),
 
                             // Título
@@ -1113,7 +1132,7 @@ class _PantallaSalaState extends State<PantallaSala>
                         ),
                       ),
 
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 1),
 
                       // Separador visual
                       Align(
@@ -1134,7 +1153,7 @@ class _PantallaSalaState extends State<PantallaSala>
                         ),
                       ),
 
-                      SizedBox(height: 5),
+                      SizedBox(height: 3),
                       // ============================================================
                       // BLOQUE 2: COLA DE CANCIONES
                       // ============================================================
@@ -1212,28 +1231,14 @@ class _PantallaSalaState extends State<PantallaSala>
                                           horizontal: 8,
                                           vertical: pantallaMuyCompacta
                                               ? 0
-                                              : (pantallaCompacta ? 2 : 4),
+                                              : (pantallaCompacta ? 2 : 3),
                                         ),
-                                        leading: ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          child: cancionCola['imagen'] != ''
-                                              ? Image.network(
-                                                  cancionCola['imagen'],
-                                                  width: tamMiniaturaCola,
-                                                  height: tamMiniaturaCola,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (_, _, _) =>
-                                                      _iconoMusica(
-                                                        esLaQueEstaSonando,
-                                                        size: tamMiniaturaCola,
-                                                      ),
-                                                )
-                                              : _iconoMusica(
-                                                  esLaQueEstaSonando,
-                                                  size: tamMiniaturaCola,
-                                                ),
+                                        leading: _miniaturaCola(
+                                          urlImagen:
+                                              cancionCola['imagen'] ?? '',
+                                          esLaQueEstaSonando:
+                                              esLaQueEstaSonando,
+                                          size: tamMiniaturaCola,
                                         ),
                                         title: Text(
                                           cancionCola['titulo'],
@@ -1374,7 +1379,7 @@ class _PantallaSalaState extends State<PantallaSala>
                       child: _buscandoApi
                           ? Center(
                               child: CircularProgressIndicator(
-                                color: Variables.textos_primarios,
+                                color: Disenos.colorVerdeNeon,
                               ),
                             )
                           : _resultadosBusqueda.isNotEmpty
@@ -1505,6 +1510,50 @@ class _PantallaSalaState extends State<PantallaSala>
         Icons.music_note,
         color: destacado ? const Color(0xFF00FFCC) : Colors.white54,
         size: size * 0.53,
+      ),
+    );
+  }
+
+  Widget _miniaturaCola({
+    required String urlImagen,
+    required bool esLaQueEstaSonando,
+    required double size,
+  }) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          fit: StackFit.expand, // el Stack llena todo el cuadrado
+          children: [
+            // Capa 1: imagen o icono de respaldo
+            urlImagen != ''
+                ? Image.network(
+                    urlImagen,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) =>
+                        _iconoMusica(esLaQueEstaSonando, size: size),
+                  )
+                : _iconoMusica(esLaQueEstaSonando, size: size),
+
+            // Capa 2 y 3: solo si está sonando
+            //Los ... es operador de expansion de lista, es decir, si esLaQueEstaSonando es true, se expande la lista y se muestra el contenido de la lista
+
+            if (esLaQueEstaSonando) ...[
+              // Oscurecer la imagen
+              Container(color: Colors.black.withOpacity(0.45)),
+              // Icono play centrado
+              Center(
+                child: Icon(
+                  Icons.play_arrow_rounded,
+                  color: Disenos.colorVerdeNeon,
+                  size: size * 0.55,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
