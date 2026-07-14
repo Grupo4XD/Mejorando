@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:proyecto_rockify/widgets/disenios.dart';
 import 'package:proyecto_rockify/widgets/variables.dart';
-import 'package:proyecto_rockify/pantallas/pantalla_Name.dart';
-import 'package:proyecto_rockify/pantallas/pantalla_Invitado.dart';
+import 'package:go_router/go_router.dart';
 
 class PantallaInicio extends StatefulWidget {
   const PantallaInicio({super.key});
@@ -45,12 +44,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                 height: 55,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const PantallaName(),
-                      ),
-                    );
+                    context.push('/crear-sala');
                   },
                   style: Disenos.estiloBotonPrimario,
                   child: const Text('Crear Sala'),
@@ -64,12 +58,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                 height: 55,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const PantallaInvitado(),
-                      ),
-                    );
+                    context.push('/unirse');
                   },
                   style: Disenos.estiloBotonSecundario,
                   child: const Text('Unirse a Sala'),

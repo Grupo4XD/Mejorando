@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:proyecto_rockify/pantallas/pantalla_Oauth.dart';
+
 import 'package:proyecto_rockify/widgets/variables.dart';
 import 'package:proyecto_rockify/widgets/disenios.dart';
+import 'package:go_router/go_router.dart';
 
 class PantallaName extends StatefulWidget {
   const PantallaName({super.key});
@@ -53,9 +54,9 @@ class _PantallaNameState extends State<PantallaName> {
                 textAlign: TextAlign.center,
                 style: Disenos.estiloSubtitulo,
               ),
-        
+
               const SizedBox(height: 30),
-        
+
               // Campo de texto para el nombre
               TextField(
                 controller: _nameController,
@@ -70,9 +71,9 @@ class _PantallaNameState extends State<PantallaName> {
                   ),
                 ),
               ),
-        
+
               const SizedBox(height: 30),
-        
+
               // Botón para continuar
               SizedBox(
                 width: double.infinity,
@@ -82,13 +83,9 @@ class _PantallaNameState extends State<PantallaName> {
                     // .trim() elimina los espacios vacíos al principio y al final
                     if (_nameController.text.trim().isNotEmpty) {
                       // Si escribió algo, avanzamos a PantallaOauth pasando el nombre como parámetro
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PantallaOauth(
-                            nombreUsuario: _nameController.text.trim(),
-                          ),
-                        ),
+                      context.push(
+                        '/oauth',
+                        extra: _nameController.text.trim(),
                       );
                     } else {
                       // Si dejó el campo vacío, le mostramos una alerta rápida (SnackBar)

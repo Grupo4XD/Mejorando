@@ -2,14 +2,15 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:proyecto_rockify/pantallas/pantalla_Inicio.dart';
-import 'package:proyecto_rockify/pantallas/pantalla_Sala.dart';
+
 import 'package:proyecto_rockify/widgets/disenios.dart';
 import 'package:proyecto_rockify/widgets/variables.dart';
+import 'package:proyecto_rockify/pantallas/spotify_auth.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
 class PantallaOauth extends StatefulWidget {
   final String nombreUsuario; // <-- Agregamos esta línea
@@ -47,16 +48,10 @@ class _PantallaOauthState extends State<PantallaOauth> {
       String tokencito = resultado['token']!;
       String codigoDeLaSala = resultado['codigoSala']!;
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PantallaSala(
-            token: tokencito,
-            codigoSala: codigoDeLaSala,
-            nombreUsuarioActual: widget.nombreUsuario,
-          ),
-        ),
-      );
+      context.push(
+        '/sala/$codigoDeLaSala',
+        extra: {'token': tokencito, 'nombre': widget.nombreUsuario},
+      ); //Le pasamos el token y el nombre del usuario
     } else {
       setState(() {
         cargando = false;
@@ -84,7 +79,7 @@ class _PantallaOauthState extends State<PantallaOauth> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          
+
           content: Text(
             mensaje,
             style: GoogleFonts.poppins(color: Colors.white70),
@@ -96,13 +91,7 @@ class _PantallaOauthState extends State<PantallaOauth> {
               ),
               onPressed: () {
                 // Cerramos el diálogo y enviamos al usuario al principio
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PantallaInicio(),
-                  ),
-                  (route) => false,
-                );
+                context.go('/');
               },
               child: Text("Entendido", style: TextStyle(color: Colors.white)),
             ),
@@ -117,8 +106,9 @@ class _PantallaOauthState extends State<PantallaOauth> {
     String codigoAutorizacion,
   ) async {
     final String urlSpotify = 'https://accounts.spotify.com/api/token';
-    final String clientId = 'cf4410e8df834a21998c3fe4d6518987';
-    final String clientSecret = 'eb34c8686e6044b9b6a2fcc6b37e9bb1';
+    // Las llaves ahora viven en UN SOLO lugar: la clase SpotifyAuth.
+    final String clientId = SpotifyAuth.clientId;
+    final String clientSecret = SpotifyAuth.clientSecret;
     final String redirectUri = 'https://macrobyte.site';
 
     print("🔄 Enviando petición a Spotify...");
@@ -137,13 +127,16 @@ class _PantallaOauthState extends State<PantallaOauth> {
         },
       );
 
-      print("📡 Status code: ${respuesta.statusCode}");
-      print("📦 Respuesta: ${respuesta.body}");
+      print("Status code: ${respuesta.statusCode}");
+      print("Respuesta: ${respuesta.body}");
 
       if (respuesta.statusCode == 200) {
         final datosJson = jsonDecode(respuesta.body);
         String token = datosJson['access_token'];
         String refreshToken = datosJson['refresh_token'];
+        // Spotify nos dice cuántos segundos vive el token (normalmente 3600 = 1h).
+        // Guardamos ESTO para luego saber cuándo hay que refrescarlo.
+        int expiresIn = datosJson['expires_in'] ?? 3600;
 
         print("👤 Obteniendo identidad del usuario en Spotify...");
 
@@ -196,9 +189,7 @@ class _PantallaOauthState extends State<PantallaOauth> {
         // 3. Generamos el nuevo código de sala y lo guardamos
         String codigoSala = (1000 + Random().nextInt(9000)).toString();
 
-        print("🏠 Creando NUEVA sala con código: $codigoSala");
         try {
-          print("🧹 El conserje está buscando salas fantasma...");
 
           final salasBasura = await FirebaseFirestore.instance
               .collection('salas')
@@ -233,6 +224,11 @@ class _PantallaOauthState extends State<PantallaOauth> {
               'creado_en': FieldValue.serverTimestamp(),
               // NUEVO CAMPO: Le decimos a Firebase cuándo destruir esta sala
               'expira_en': Timestamp.fromDate(horaDeMuerte),
+              // NUEVO: cuándo muere el ACCESS_TOKEN (distinto a cuándo muere la sala).
+              // Sin este dato no sabríamos cuándo refrescar el token.
+              'expira_token_en': Timestamp.fromDate(
+                DateTime.now().add(Duration(seconds: expiresIn)),
+              ),
             });
 
         print("✅ Sala creada en Firestore");

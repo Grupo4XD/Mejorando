@@ -1,11 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:proyecto_rockify/pantallas/pantalla_Inicio.dart';
 import 'package:proyecto_rockify/widgets/disenios.dart';
 import 'package:proyecto_rockify/widgets/variables.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async'; // Para usar Timer
 import 'package:proyecto_rockify/pantallas/peticionesApi.dart';
+import 'package:proyecto_rockify/pantallas/spotify_auth.dart';
+import 'package:go_router/go_router.dart';
 
 class PantallaSala extends StatefulWidget {
   final String codigoSala;
@@ -38,6 +39,7 @@ class _PantallaSalaState extends State<PantallaSala>
   //List<dynamic> _dislikesAnteriores = [];
 
   String _tokenActual = ''; // <-- Almacenará el token de forma interna
+  DateTime? _expiraToken; // <-- Cuándo muere el token actual (para saber cuándo refrescar)
 
   //############## VARIABLE PARA VER EL BUSCADOR ###################
 
@@ -173,9 +175,46 @@ class _PantallaSalaState extends State<PantallaSala>
   // ────────────────────────────────────────────────────────────────────
   // FUNCIÓN QUE HACE AMBAS PETICIONES Y ACTUALIZA EL ESTADO
   // ────────────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────────
+  // ASEGURAR TOKEN VÁLIDO (aquí es donde el refresh_token deja de ser adorno)
+  //
+  // Regla: SOLO el creador (dueño del token) lo refresca. Cuando lo hace,
+  // actualiza Firestore y el stream reparte el token nuevo a los invitados.
+  // Así evitamos que 10 celulares refresquen a la vez.
+  // ────────────────────────────────────────────────────────────────────
+  Future<void> _asegurarTokenValido() async {
+    bool esCreador =
+        _nombresUsuarios.isNotEmpty &&
+        widget.nombreUsuarioActual == _nombresUsuarios[0];
+    // Los invitados NO refrescan: solo usan el token que el creador deja en Firestore.
+    if (!esCreador) return;
+
+    // Chequeo local barato: ¿el token está por expirar (o no sabemos cuándo)?
+    // Esto evita leer Firestore cada 2 segundos sin necesidad.
+    final ahora = DateTime.now();
+    final bool porExpirar =
+        _expiraToken == null ||
+        ahora.isAfter(_expiraToken!.subtract(const Duration(minutes: 1)));
+    if (!porExpirar) return; // Todavía sirve, no hacemos nada.
+
+    // Delegamos el trabajo pesado a SpotifyAuth (leer, refrescar, guardar).
+    final nuevoToken = await SpotifyAuth.obtenerTokenValidoDeSala(
+      widget.codigoSala,
+    );
+    if (nuevoToken != null && mounted) {
+      setState(() {
+        _tokenActual = nuevoToken;
+      });
+    }
+  }
+
   Future<void> _actualizarReproductor() async {
     // Si todavía no se ha descargado el token de Firestore, detenemos la función
     if (_tokenActual.isEmpty) return;
+
+    // 0. ANTES de usar la API, nos aseguramos de tener un token vivo.
+    await _asegurarTokenValido();
+
     // 1. Canción actual
     final Map<String, dynamic>? datosCancion =
         await Peticionesapi.ObtenerCancionActual(_tokenActual);
@@ -366,6 +405,11 @@ class _PantallaSalaState extends State<PantallaSala>
 
                 // Actualizamos el token dinámicamente (vital para los invitados)
                 _tokenActual = datos['spotify_access_token'] ?? '';
+
+                // Leemos también CUÁNDO expira el token. Cuando el creador lo
+                // refresca, este valor cambia en Firestore y todos se enteran.
+                final Timestamp? expiraTokenTs = datos['expira_token_en'];
+                _expiraToken = expiraTokenTs?.toDate();
               });
             }
           }
@@ -428,11 +472,7 @@ class _PantallaSalaState extends State<PantallaSala>
     if (!mounted) return;
 
     // Navega a PantallaInicio limpiando todo el stack de navegación
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const PantallaInicio()),
-      (route) => false,
-    );
+    context.go('/');
   }
 
   //ESTA FUNCION ES LA QUE MAS IMPORTA,

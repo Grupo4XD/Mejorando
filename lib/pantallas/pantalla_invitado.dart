@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:proyecto_rockify/pantallas/pantalla_Sala.dart';
 import 'package:proyecto_rockify/widgets/disenios.dart';
 import 'package:proyecto_rockify/widgets/variables.dart';
+import 'package:go_router/go_router.dart';
 
 class PantallaInvitado extends StatefulWidget {
   const PantallaInvitado({super.key});
@@ -79,17 +79,10 @@ class _PantallaInvitadoState extends State<PantallaInvitado> {
 
         // 3. Redirigimos a la PantallaSala pasándole el código
         // NOTA: Dejamos el token como opcional porque la sala lo cargará desde Firestore
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PantallaSala(
-              codigoSala: codigo,
-              token:
-                  '', // Le pasamos un texto vacío; la pantalla se encargará de buscar el real
-              nombreUsuarioActual: nombre,
-            ),
-          ),
-        );
+        context.push('/sala/$codigo', extra: {
+          'token': '', // Le pasamos un texto vacío; la pantalla se encargará de buscar el real
+          'nombre': nombre,
+        });
       } else {
         // Si el código no existe en Firestore, avisamos al usuario
         if (!mounted) return;
