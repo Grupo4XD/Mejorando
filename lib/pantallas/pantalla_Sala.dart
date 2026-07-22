@@ -191,10 +191,13 @@ class _PantallaSalaState extends State<PantallaSala>
 
     // Chequeo local barato: ¿el token está por expirar (o no sabemos cuándo)?
     // Esto evita leer Firestore cada 2 segundos sin necesidad.
+
     final ahora = DateTime.now();
     final bool porExpirar =
         _expiraToken == null ||
         ahora.isAfter(_expiraToken!.subtract(const Duration(minutes: 1)));
+
+
     if (!porExpirar) return; // Todavía sirve, no hacemos nada.
 
     // Delegamos el trabajo pesado a SpotifyAuth (leer, refrescar, guardar).

@@ -10,7 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 ///   2. Cuando migremos a PKCE, solo tocamos ESTE archivo.
 ///   3. Es más fácil de entender y de proteger.
 class SpotifyAuth {
-  // ⚠️ TEMPORAL: estas llaves siguen dentro de la app (igual que antes).
+  // TEMPORAL: estas llaves siguen dentro de la app (igual que antes).
   // En el siguiente paso las moveremos a un .env y migraremos a PKCE para
   // ELIMINAR el clientSecret por completo. Por ahora solo las centralizamos.
   static const String clientId = 'cf4410e8df834a21998c3fe4d6518987';
@@ -120,7 +120,7 @@ class SpotifyAuth {
       'spotify_access_token': nuevoToken,
       'expira_token_en': Timestamp.fromDate(nuevaExpiracion),
       // Solo pisamos el refresh_token si Spotify nos dio uno nuevo:
-      if (nuevoRefresh != null) 'spotify_refresh_token': nuevoRefresh,
+      'spotify_refresh_token': ?nuevoRefresh,
     });
 
     print('✅ Token refrescado. Nuevo vencimiento: $nuevaExpiracion');

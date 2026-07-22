@@ -74,6 +74,7 @@ class _PantallaOauthState extends State<PantallaOauth> {
           ),
           title: Text(
             "Cuenta no compatible",
+            textAlign: TextAlign.center,
             style: GoogleFonts.montserrat(
               color: Colors.white,
               fontWeight: FontWeight.bold,
@@ -85,15 +86,17 @@ class _PantallaOauthState extends State<PantallaOauth> {
             style: GoogleFonts.poppins(color: Colors.white70),
           ),
           actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
+            Center(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                ),
+                onPressed: () {
+                  // Cerramos el diálogo y enviamos al usuario al principio
+                  context.go('/');
+                },
+                child: Text("Entendido", style: TextStyle(color: Colors.white)),
               ),
-              onPressed: () {
-                // Cerramos el diálogo y enviamos al usuario al principio
-                context.go('/');
-              },
-              child: Text("Entendido", style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -183,6 +186,7 @@ class _PantallaOauthState extends State<PantallaOauth> {
             print("🗑️ Sala antigua huérfana eliminada: ${doc.id}");
           }
         }
+
         // Calculamos la hora de expiración: El momento actual + 4 horas
         DateTime horaDeMuerte = DateTime.now().add(const Duration(hours: 4));
 
@@ -190,7 +194,6 @@ class _PantallaOauthState extends State<PantallaOauth> {
         String codigoSala = (1000 + Random().nextInt(9000)).toString();
 
         try {
-
           final salasBasura = await FirebaseFirestore.instance
               .collection('salas')
               .where('expira_en', isLessThan: Timestamp.now())
@@ -212,24 +215,21 @@ class _PantallaOauthState extends State<PantallaOauth> {
         // DateTime horaDeMuerte = DateTime.now().add(const Duration(hours: 4));
         // String codigoSala = ...
 
-        await FirebaseFirestore.instance
-            .collection('salas')
-            .doc(codigoSala)
-            .set({
-              'codigo_sala': codigoSala,
-              'spotify_access_token': token,
-              'spotify_refresh_token': refreshToken,
-              'spotify_id': spotifyId, // <-- Guardamos su ID de Spotify aquí
-              'usuarios': [widget.nombreUsuario],
-              'creado_en': FieldValue.serverTimestamp(),
-              // NUEVO CAMPO: Le decimos a Firebase cuándo destruir esta sala
-              'expira_en': Timestamp.fromDate(horaDeMuerte),
-              // NUEVO: cuándo muere el ACCESS_TOKEN (distinto a cuándo muere la sala).
-              // Sin este dato no sabríamos cuándo refrescar el token.
-              'expira_token_en': Timestamp.fromDate(
-                DateTime.now().add(Duration(seconds: expiresIn)),
-              ),
-            });
+        await FirebaseFirestore.instance.collection('salas').doc(codigoSala).set({
+          'codigo_sala': codigoSala,
+          'spotify_access_token': token,
+          'spotify_refresh_token': refreshToken,
+          'spotify_id': spotifyId, // <-- Guardamos su ID de Spotify aquí
+          'usuarios': [widget.nombreUsuario],
+          'creado_en': FieldValue.serverTimestamp(),
+          // NUEVO CAMPO: Le decimos a Firebase cuándo destruir esta sala
+          'expira_en': Timestamp.fromDate(horaDeMuerte),
+          // NUEVO: cuándo muere el ACCESS_TOKEN (distinto a cuándo muere la sala).
+          // Sin este dato no sabríamos cuándo refrescar el token.
+          'expira_token_en': Timestamp.fromDate(
+            DateTime.now().add(Duration(seconds: expiresIn)),
+          ),
+        });
 
         print("✅ Sala creada en Firestore");
         return {"token": token, "codigoSala": codigoSala};
