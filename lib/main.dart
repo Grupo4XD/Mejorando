@@ -1,21 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-import 'app_router.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'app/app.dart';
+import 'core/config/app_config.dart';
+import 'core/network/api_client.dart';
+import 'features/auth/data/auth_repository.dart';
 
 void main() async {
-  runApp(const MainApp());
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-}
-
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp.router(
-      //Solo configuramos el .router y quitamos el home, ya que el router se encarga de la navegación
-      routerConfig: appRouter,
-    );
-  }
+  WidgetsFlutterBinding.ensureInitialized();
+  const storage = FlutterSecureStorage();
+  final config = AppConfig.fromEnvironment();
+  final authRepository = AuthRepository(ApiClient(config, storage), storage);
+  await authRepository.initialize();
+  runApp(ProviderScope(overrides: [appConfigProvider.overrideWithValue(config), authRepositoryProvider.overrideWithValue(authRepository)], child: const RockifyApp()));
 }
