@@ -74,21 +74,27 @@ class _PantallaOauthState extends State<PantallaOauth> {
               color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
+            textAlign: TextAlign.center,
           ),
           content: Text(
             mensaje,
             style: GoogleFonts.poppins(color: Colors.white70),
+            textAlign: TextAlign.center,
           ),
           actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
+            
+            Center(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                ),
+                onPressed: () {
+                  context.go('/');
+                },
+                child: const Text("Entendido", style: TextStyle(color: Colors.white)),
               ),
-              onPressed: () {
-                context.go('/');
-              },
-              child: const Text("Entendido", style: TextStyle(color: Colors.white)),
             ),
+
           ],
         );
       },
@@ -142,6 +148,12 @@ class _PantallaOauthState extends State<PantallaOauth> {
                   "Necesitas Spotify Premium para ser el anfitrión de una sala.",
             };
           }
+        } else {
+          return {
+            "error": true,
+            "mensaje":
+                "No se pudo verificar tu cuenta de Spotify. Intenta de nuevo.",
+          };
         }
 
         // Eliminar salas huérfanas creadas anteriormente por este usuario
