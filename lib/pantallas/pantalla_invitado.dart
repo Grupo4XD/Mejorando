@@ -12,14 +12,12 @@ class PantallaInvitado extends StatefulWidget {
 }
 
 class _PantallaInvitadoState extends State<PantallaInvitado> {
-  // Dos controladores: uno para el apodo y otro para el código de 4 dígitos
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _codigoController = TextEditingController();
 
   bool _cargando = false;
 
   @override
-  //Cuando se destruye la pantalla esto se ejecuta y evita la fuga de memoria
   void dispose() {
     _nameController.dispose();
     _codigoController.dispose();
@@ -30,7 +28,6 @@ class _PantallaInvitadoState extends State<PantallaInvitado> {
     final String nombre = _nameController.text.trim();
     final String codigo = _codigoController.text.trim();
 
-    // Validamos que los campos no estén vacíos
     if (nombre.isEmpty || codigo.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor, completa todos los campos')),
@@ -41,23 +38,19 @@ class _PantallaInvitadoState extends State<PantallaInvitado> {
     setState(() {
       _cargando = true;
     });
-  
+
     try {
-      // Buscamos en Firestore si existe un documento con ese código de sala
       DocumentReference salaRef = FirebaseFirestore.instance
           .collection('salas')
           .doc(codigo);
       DocumentSnapshot doc = await salaRef.get();
-      
 
       if (doc.exists) {
-        // Extraemos la lista actual de usuarios de la base de datos
         List<dynamic> usuariosActuales = doc['usuarios'] ?? [];
-        // El nombre que escribió el invitado
 
-        //VERIFICAMOS SI EL NOMBRE ESTA EN LA SALA
+        // Evita nombres duplicados dentro de la misma sala
         if (usuariosActuales.contains(nombre)) {
-          // ignore: use_build_context_synchronously
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
@@ -66,25 +59,22 @@ class _PantallaInvitadoState extends State<PantallaInvitado> {
               backgroundColor: Colors.redAccent,
             ),
           );
-          return; // Detenemos la función, no lo dejamos entrar
+          return;
         }
 
-        // 2. Si la sala existe, agregamos el nombre del invitado a la lista 'usuarios'
-        // 'arrayUnion' añade el elemento solo si no se repite, manteniendo la lista limpia
+        // Agrega el invitado a la lista en Firestore sin duplicar
         await salaRef.update({
           'usuarios': FieldValue.arrayUnion([nombre]),
         });
 
         if (!mounted) return;
 
-        // 3. Redirigimos a la PantallaSala pasándole el código
-        // NOTA: Dejamos el token como opcional porque la sala lo cargará desde Firestore
+        // El token se pasa vacío porque la sala lo obtiene y sincroniza desde Firestore
         context.push('/sala/$codigo', extra: {
-          'token': '', // Le pasamos un texto vacío; la pantalla se encargará de buscar el real
+          'token': '',
           'nombre': nombre,
         });
       } else {
-        // Si el código no existe en Firestore, avisamos al usuario
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -116,22 +106,18 @@ class _PantallaInvitadoState extends State<PantallaInvitado> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Disenos.colorVerdeNeon),
       ),
-      body: 
-      Container(
-        
+      body: Container(
         decoration: Variables.fondobody,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 40),
           child: Center(
             child: SingleChildScrollView(
-              // Evita errores de pantalla si se abre el teclado
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset(
                     "assets/imagenes/logo.png",
                     width: MediaQuery.of(context).size.width * 0.35,
-                    //height: MediaQuery.of(context).size.width * 0.8,
                   ),
                   Text(
                     'Unirse a una Sala',
@@ -139,8 +125,6 @@ class _PantallaInvitadoState extends State<PantallaInvitado> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 30),
-        
-                  // TextField para el nombre
                   TextField(
                     controller: _nameController,
                     style: Disenos.estiloTextoInput,
@@ -153,24 +137,19 @@ class _PantallaInvitadoState extends State<PantallaInvitado> {
                     ),
                   ),
                   const SizedBox(height: 20),
-        
-                  // TextField para el código de sala
                   TextField(
                     controller: _codigoController,
-                    keyboardType:
-                        TextInputType.number, // Muestra el teclado numérico
+                    keyboardType: TextInputType.number,
                     style: Disenos.estiloTextoInput,
                     decoration: Disenos.estiloCampoTexto.copyWith(
                       hintText: "Codigo de sala",
                       prefixIcon: const Icon(
                         Icons.code,
                         color: Disenos.colorVerdeNeon,
-                      )
-                    )
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 40),
-        
-                  // Botón Unirme
                   SizedBox(
                     width: double.infinity,
                     height: 50,

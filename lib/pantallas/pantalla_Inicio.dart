@@ -13,11 +13,8 @@ class PantallaInicio extends StatefulWidget {
 class _PantallaInicioState extends State<PantallaInicio> {
   @override
   Widget build(BuildContext context) {
-    // 1. Agregamos el Scaffold aquí para que la pantalla sea independiente
     return Scaffold(
-      //Para que el body se extienda hasta arriba y haga que se vea como transparente
       extendBodyBehindAppBar: true,
-      //appBar: Variables.MiAppbar, // Traemos tu AppBar personalizado
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -30,15 +27,11 @@ class _PantallaInicioState extends State<PantallaInicio> {
               Image.asset(
                 "assets/imagenes/logo.png",
                 width: MediaQuery.of(context).size.width * 0.35,
-                //height: MediaQuery.of(context).size.width * 0.8,
               ),
-              //Texto despues de la iamgen
               Text('Rockify', style: Disenos.estiloTitulo),
               const SizedBox(height: 5),
               Text('Tu rockola remota', style: Disenos.estiloSubtitulo),
-
-              SizedBox(height: 25),
-
+              const SizedBox(height: 25),
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -50,9 +43,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                   child: const Text('Crear Sala'),
                 ),
               ),
-
               const SizedBox(height: 20),
-
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -64,8 +55,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                   child: const Text('Unirse a Sala'),
                 ),
               ),
-              const SizedBox(height: 30), // Espacio antes del texto final
-              
+              const SizedBox(height: 30),
               Text(
                 'Necesitas Spotify Premium\npara crear una sala.',
                 textAlign: TextAlign.center,

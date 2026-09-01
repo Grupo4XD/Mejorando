@@ -4,7 +4,6 @@ import 'package:proyecto_rockify/widgets/disenios.dart';
 
 class Variables {
   static const Color textos_primarios = Colors.tealAccent;
-  //static const Color fondoSuperior = Color(0xFF003333);
   static const Color fondoInferior = Color(0xFF001A1A);
   static const Color fondoBotones = Color(0xFF003333);
   static final estiloTextoBotones = GoogleFonts.comfortaa(
@@ -21,35 +20,30 @@ class Variables {
     foregroundColor: Colors.black,
   );
 
-  //Fondo de mi body
   static const BoxDecoration fondobody = BoxDecoration(
     gradient: RadialGradient(
-      center: Alignment.center, // El punto de origen del gradiente
-      radius:
-          1.2, // Qué tanto se expande (1.2 cubre toda la pantalla suavemente)
+      center: Alignment.center,
+      radius: 1.2,
       colors: [
-        Color(0xFF141E30), // El azul oscuro/marino del centro
-        Color(0xFF070B14), // El negro profundo de los bordes
+        Color(0xFF141E30),
+        Color(0xFF070B14),
       ],
-      stops: [0.3, 1.0], // Controla dónde empieza a oscurecerse
+      stops: [0.3, 1.0],
     ),
   );
-  
-  //El appBar
 
   static final AppBar MiAppbar = AppBar(
-    backgroundColor: Colors.transparent, // Hace el AppBar transparente
-    elevation: 0, // Elimina la sombra del AppBar
+    backgroundColor: Colors.transparent,
+    elevation: 0,
     title: Row(
-      mainAxisAlignment:
-          MainAxisAlignment.center, // Centra el contenido del AppBar
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Icon(
           Icons.music_note,
           color: Variables.textos_primarios,
           size: 35,
-        ), // Ajusta el tamaño del logo
-        const SizedBox(width: 10), // Espacio entre el logo y el texto
+        ),
+        const SizedBox(width: 10),
         Text(
           'Rockify',
           style: GoogleFonts.comfortaa(
@@ -57,7 +51,7 @@ class Variables {
             fontSize: 25,
             fontWeight: FontWeight.bold,
           ),
-        ), // Título del AppBar
+        ),
       ],
     ),
   );

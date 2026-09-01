@@ -13,7 +13,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 
 class PantallaOauth extends StatefulWidget {
-  final String nombreUsuario; // <-- Agregamos esta línea
+  final String nombreUsuario;
   const PantallaOauth({super.key, required this.nombreUsuario});
 
   @override
@@ -32,45 +32,41 @@ class _PantallaOauthState extends State<PantallaOauth> {
     );
 
     if (resultado != null && mounted) {
-      // ¡NUEVA LÓGICA AQUÍ!
-      // Verificamos si la función anterior nos devolvió un error (Usuario Free)
+      // Si la cuenta no es Premium, se rechaza la creación de sala
       if (resultado.containsKey('error') && resultado['error'] == true) {
         setState(() {
           cargando = false;
         });
-
-        // Le mostramos un cartel al usuario y lo mandamos a la pantalla de inicio
         _mostrarErrorPremium(resultado['mensaje']);
-        return; // Detenemos la ejecución de esta función
+        return;
       }
 
-      // Si no hay error, el flujo continúa normal (Es Premium)
       String tokencito = resultado['token']!;
       String codigoDeLaSala = resultado['codigoSala']!;
 
       context.push(
         '/sala/$codigoDeLaSala',
         extra: {'token': tokencito, 'nombre': widget.nombreUsuario},
-      ); //Le pasamos el token y el nombre del usuario
+      );
     } else {
-      setState(() {
-        cargando = false;
-        print("Algo ocurrió mal");
-      });
+      if (mounted) {
+        setState(() {
+          cargando = false;
+        });
+      }
     }
   }
 
-  // Función para mostrar el cartel si el usuario no es Premium
   void _mostrarErrorPremium(String mensaje) {
     showDialog(
       context: context,
-      barrierDismissible: false, // Obliga al usuario a tocar el botón
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: Disenos.colorFondoSuperior, // Usamos tu paleta
+          backgroundColor: Disenos.colorFondoSuperior,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
-            side: BorderSide(color: Colors.redAccent, width: 2),
+            side: const BorderSide(color: Colors.redAccent, width: 2),
           ),
           title: Text(
             "Cuenta no compatible",
@@ -79,7 +75,6 @@ class _PantallaOauthState extends State<PantallaOauth> {
               fontWeight: FontWeight.bold,
             ),
           ),
-
           content: Text(
             mensaje,
             style: GoogleFonts.poppins(color: Colors.white70),
@@ -90,10 +85,9 @@ class _PantallaOauthState extends State<PantallaOauth> {
                 backgroundColor: Colors.redAccent,
               ),
               onPressed: () {
-                // Cerramos el diálogo y enviamos al usuario al principio
                 context.go('/');
               },
-              child: Text("Entendido", style: TextStyle(color: Colors.white)),
+              child: const Text("Entendido", style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -101,18 +95,13 @@ class _PantallaOauthState extends State<PantallaOauth> {
     );
   }
 
-  // Cambiamos el retorno a Future<String?> por si ocurre un error
   Future<Map<String, dynamic>?> canjearCodigoPorToken(
     String codigoAutorizacion,
   ) async {
-    final String urlSpotify = 'https://accounts.spotify.com/api/token';
-    // Las llaves ahora viven en UN SOLO lugar: la clase SpotifyAuth.
+    const String urlSpotify = 'https://accounts.spotify.com/api/token';
     final String clientId = SpotifyAuth.clientId;
     final String clientSecret = SpotifyAuth.clientSecret;
-    final String redirectUri = 'https://macrobyte.site';
-
-    print("🔄 Enviando petición a Spotify...");
-    print("📝 Código de autorización: $codigoAutorizacion");
+    const String redirectUri = 'https://macrobyte.site';
 
     try {
       final respuesta = await http.post(
@@ -127,20 +116,13 @@ class _PantallaOauthState extends State<PantallaOauth> {
         },
       );
 
-      print("Status code: ${respuesta.statusCode}");
-      print("Respuesta: ${respuesta.body}");
-
       if (respuesta.statusCode == 200) {
         final datosJson = jsonDecode(respuesta.body);
         String token = datosJson['access_token'];
         String refreshToken = datosJson['refresh_token'];
-        // Spotify nos dice cuántos segundos vive el token (normalmente 3600 = 1h).
-        // Guardamos ESTO para luego saber cuándo hay que refrescarlo.
         int expiresIn = datosJson['expires_in'] ?? 3600;
 
-        print("👤 Obteniendo identidad del usuario en Spotify...");
-
-        // 1. NUEVO: Le pedimos a Spotify el perfil del usuario usando su token
+        // Requiere Spotify Premium para controlar la reproducción de la rockola
         final respuestaPerfil = await http.get(
           Uri.parse('https://api.spotify.com/v1/me'),
           headers: {'Authorization': 'Bearer $token'},
@@ -149,20 +131,11 @@ class _PantallaOauthState extends State<PantallaOauth> {
         String spotifyId = 'desconocido';
 
         if (respuestaPerfil.statusCode == 200) {
-          // Guardamos el JSON decodificado en una variable
           final perfilData = jsonDecode(respuestaPerfil.body);
-
           spotifyId = perfilData['id'];
-          print("🆔 ID de Spotify detectado: $spotifyId");
-
-          // Leemos el tipo de suscripción del usuario
           String tipoSuscripcion = perfilData['product'] ?? 'free';
 
           if (tipoSuscripcion != 'premium') {
-            // El usuario es Free.
-            print("🚫 El usuario es Free. Deteniendo creación de sala.");
-
-            // Devolvemos un mapa especial indicando el error
             return {
               "error": true,
               "mensaje":
@@ -171,46 +144,33 @@ class _PantallaOauthState extends State<PantallaOauth> {
           }
         }
 
-        // 2. NUEVO: Buscamos si este usuario ya tenía una sala abierta y la eliminamos
+        // Eliminar salas huérfanas creadas anteriormente por este usuario
         if (spotifyId != 'desconocido') {
           final salasAnteriores = await FirebaseFirestore.instance
               .collection('salas')
-              .where('spotify_id', isEqualTo: spotifyId) // Buscamos su ID
+              .where('spotify_id', isEqualTo: spotifyId)
               .get();
 
           for (var doc in salasAnteriores.docs) {
-            await doc.reference.delete(); // Borramos la sala vieja
-            print("🗑️ Sala antigua huérfana eliminada: ${doc.id}");
+            await doc.reference.delete();
           }
         }
-        // Calculamos la hora de expiración: El momento actual + 4 horas
-        DateTime horaDeMuerte = DateTime.now().add(const Duration(hours: 4));
 
-        // 3. Generamos el nuevo código de sala y lo guardamos
-        String codigoSala = (1000 + Random().nextInt(9000)).toString();
-
+        // Limpieza de salas vencidas en segundo plano
         try {
-
           final salasBasura = await FirebaseFirestore.instance
               .collection('salas')
               .where('expira_en', isLessThan: Timestamp.now())
               .limit(5)
               .get();
 
-          // Si encontró salas viejas, las borra una por una
           for (var sala in salasBasura.docs) {
-            print("🗑️ Borrando sala huérfana: ${sala.id}");
             await sala.reference.delete();
           }
-        } catch (e) {
-          print(
-            "Error en el conserje: $e",
-          ); // Si falla por falta de internet, no pasa nada, la app sigue
-        }
+        } catch (_) {}
 
-        // 2. AQUÍ SIGUE TU CÓDIGO NORMAL PARA CREAR LA NUEVA SALA...
-        // DateTime horaDeMuerte = DateTime.now().add(const Duration(hours: 4));
-        // String codigoSala = ...
+        DateTime horaDeMuerte = DateTime.now().add(const Duration(hours: 4));
+        String codigoSala = (1000 + Random().nextInt(9000)).toString();
 
         await FirebaseFirestore.instance
             .collection('salas')
@@ -219,29 +179,27 @@ class _PantallaOauthState extends State<PantallaOauth> {
               'codigo_sala': codigoSala,
               'spotify_access_token': token,
               'spotify_refresh_token': refreshToken,
-              'spotify_id': spotifyId, // <-- Guardamos su ID de Spotify aquí
+              'spotify_id': spotifyId,
               'usuarios': [widget.nombreUsuario],
               'creado_en': FieldValue.serverTimestamp(),
-              // NUEVO CAMPO: Le decimos a Firebase cuándo destruir esta sala
+              // Expiración de la sala (4 horas)
               'expira_en': Timestamp.fromDate(horaDeMuerte),
-              // NUEVO: cuándo muere el ACCESS_TOKEN (distinto a cuándo muere la sala).
-              // Sin este dato no sabríamos cuándo refrescar el token.
+              // Expiración del access_token para refrescarlo oportunamente (~1 hora)
               'expira_token_en': Timestamp.fromDate(
                 DateTime.now().add(Duration(seconds: expiresIn)),
               ),
             });
 
-        print("✅ Sala creada en Firestore");
         return {"token": token, "codigoSala": codigoSala};
       } else {
-        print("Error de autenticacion");
         return null;
       }
     } catch (e) {
-      print("Exepcion: $e");
-      setState(() {
-        error_autenticacion = "Error de conexión: $e";
-      });
+      if (mounted) {
+        setState(() {
+          error_autenticacion = "Error de conexión: $e";
+        });
+      }
       return null;
     }
   }
@@ -253,7 +211,7 @@ class _PantallaOauthState extends State<PantallaOauth> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          // IMPORTANTE: Convertimos esta función en asíncrona (async)
+          // Intercepta la URL de callback de OAuth para obtener el authorization code
           onNavigationRequest: (NavigationRequest request) {
             if (request.url.startsWith('https://macrobyte.site')) {
               Uri uri = Uri.parse(request.url);
@@ -263,8 +221,6 @@ class _PantallaOauthState extends State<PantallaOauth> {
                 setState(() {
                   cargando = true;
                 });
-
-                // Llamamos sin await, dejamos que corra en paralelo
                 _procesarToken(codigoAutorizacion);
               }
               return NavigationDecision.prevent;
@@ -283,7 +239,7 @@ class _PantallaOauthState extends State<PantallaOauth> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF001A1A), // Tu fondo oscuro de Rockola
+      backgroundColor: const Color(0xFF001A1A),
       body: Container(
         decoration: Variables.fondobody,
         child: cargando
@@ -291,10 +247,10 @@ class _PantallaOauthState extends State<PantallaOauth> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CircularProgressIndicator(
-                      color: Disenos.colorVerdeNeon, // Tu color cian brillante
+                    const CircularProgressIndicator(
+                      color: Disenos.colorVerdeNeon,
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     Text(
                       "Cargando sala",
                       style: GoogleFonts.comfortaa(

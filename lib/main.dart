@@ -14,7 +14,7 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      //Solo configuramos el .router y quitamos el home, ya que el router se encarga de la navegación
+      debugShowCheckedModeBanner: false,
       routerConfig: appRouter,
     );
   }
